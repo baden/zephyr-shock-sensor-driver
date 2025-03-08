@@ -1,9 +1,10 @@
 config SENSOR_SHOCK
 	bool "ADC based analog shock sensor driver"
 	default y
-	depends on MULTITHREADING
+	depends on MULTITHREADING && DT_HAS_ZEPHYR_SHOCK_SENSOR_ENABLED
 	select ADC
     select ADC_ASYNC
+	select SENSOR
 	help
 	  ADC based analog shock sensor
 
