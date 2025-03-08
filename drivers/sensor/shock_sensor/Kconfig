@@ -1,0 +1,24 @@
+config SENSOR_SHOCK
+	bool "ADC based analog shock sensor driver"
+	default y
+	depends on MULTITHREADING
+	select ADC
+    select ADC_ASYNC
+	help
+	  ADC based analog shock sensor
+
+if SENSOR_SHOCK
+
+config SENSOR_SHOCK_THREAD_STACK_SIZE
+	int "Stack size for the analog input thread"
+	default 2048
+	help
+	  Size of the stack used for the analog thread.
+
+config SENSOR_SHOCK_THREAD_PRIORITY
+	int "Priority for the analog input thread"
+	default 0
+	help
+	  Priority level of the analog thread.
+
+endif
