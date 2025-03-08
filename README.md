@@ -1,0 +1,1 @@
+# zephyr-shock-sensor-driver
