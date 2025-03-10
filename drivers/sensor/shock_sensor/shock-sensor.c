@@ -360,7 +360,7 @@ static void adc_vbus_work_handler(struct k_work *work)
     // Save 16x value, but use normalised value later
     adc_centered_value = (adc_centered_value * (CONFIG_SHAKE_CENTERED_COUNT-1) + new_val) / CONFIG_SHAKE_CENTERED_COUNT;
 
-    // LOG_ERR("Shake sensor sample_raw: %d", val.val1);
+    // LOG_ERR("Shake sensor sample_raw: %d", new_val);
 
     if(shake_main) {
         shake_main--;
@@ -388,9 +388,10 @@ static void adc_vbus_work_handler(struct k_work *work)
     #endif
 
     // if(debug_counter >= 31) {
-    //     LOG_ERR("Shake amplitude: %d  %d-%d-%d", 
+    //     LOG_ERR("Shake amplitude: %d  %d-%d-%d. W: %d, M: %d", 
     //         amplitude_abs,
-    //         min, adc_centered_value, max
+    //         min, adc_centered_value, max,
+    //         data->treshold_warn, data->treshold_main
     //     );
     //     debug_counter = 0;
     // }
