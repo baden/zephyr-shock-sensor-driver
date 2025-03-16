@@ -29,13 +29,9 @@ struct sensor_config {
 
 // struct k_poll_signal async_sig = K_POLL_SIGNAL_INITIALIZER(async_sig);
 
-#ifdef CONFIG_SEQUENCE_32BITS_REGISTERS
-    #define ADC_READING_TYPE uint32_t
-#else
-    #define ADC_READING_TYPE uint16_t
-#endif
 
-#define CONFIG_SEQUENCE_SAMPLES 16
+
+
 #define CONFIG_SHAKE_CENTERED_COUNT (256 / CONFIG_SEQUENCE_SAMPLES)
 // Можливо треба зробити вдвічі більше ніж CONFIG_SHAKE_CENTERED_COUNT.
 // Хоча раз взагалі якось працює і при 1, то може значення 4 буде більш ніж достатньо.
@@ -47,26 +43,7 @@ struct sensor_config {
 #define CONFIG_SHAKE_MAIN_TIME Secs(1)
 #define CONFIG_SHAKE_WARN_TIME Secs(1)
 
-struct sensor_data {
-    struct adc_sequence sequence;
-    k_timeout_t earliest_sample;
-    ADC_READING_TYPE raw[CONFIG_SEQUENCE_SAMPLES];
 
-    const struct device *dev;   // self reference
-    struct k_work_q workq;   /* work queue */
-    struct k_work_delayable dwork;  /* workers */
-
-    // #ifndef CONFIG_USE_SYS_WORK_Q
-    //     K_KERNEL_STACK_MEMBER(workq_stack, CONFIG_SENSOR_SHOCK_THREAD_STACK_SIZE);
-    // #endif
-    // struct k_poll_signal async_sig;
-    sensor_trigger_handler_t warn_handler;
-    const struct sensor_trigger *warn_trigger;
-    sensor_trigger_handler_t main_handler;
-    const struct sensor_trigger *main_trigger;
-    int treshold_warn;
-    int treshold_main;
-};
 
 
 static int fetch(const struct device *dev, enum sensor_channel chan)
@@ -142,7 +119,50 @@ static int attr_set(const struct device *dev,
     if (chan == SENSOR_CHAN_PROX && attr == SENSOR_ATTR_UPPER_THRESH) {
         data->treshold_warn = val->val1;
         data->treshold_main = val->val2;
+        data->tap_count = 0;
+        data->last_coarsering_time = k_uptime_get();
         LOG_ERR("Seted treshold_warn: %d, treshold_main: %d", data->treshold_warn, data->treshold_main);
+        return 0;
+    }
+
+    if (chan == SHOCK_SENSOR_CHANNEL_THRESHHOLDS_WARN_MAIN_MAX && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
+        data->threshold_warn_max = val->val1;
+        data->threshold_main_max = val->val2;
+        LOG_ERR("Seted threshold_warn_max: %d, threshold_main_max: %d", data->threshold_warn_max, data->threshold_main_max);
+        return 0;
+    }
+
+    if (chan == SHOCK_SENSOR_CHANNEL_COARSING_WARN_MAIN_PERCENRS && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
+        data->coarsering_warn_percents = val->val1;
+        data->coarsering_main_percents = val->val2;
+        LOG_ERR("Seted coarsering_warn_percents: %d, coarsering_main_percents: %d", data->coarsering_warn_percents, data->coarsering_main_percents);
+        return 0;
+    }
+
+
+    if (chan == SHOCK_SENSOR_CHANNEL_TRESHHOLDS_INITIAL && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
+        data->treshhold_warn_initial = val->val1;
+        data->treshhold_main_initial = val->val2;
+        LOG_ERR("Seted treshhold_warn_initial: %d, treshhold_main_initial: %d", data->treshhold_warn_initial, data->treshhold_main_initial);
+        return 0;
+    }
+
+    if (chan == SHOCK_SENSOR_CHANNEL_TAP_MIN_MAX_INTERVALS && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
+        data->min_tap_interval = val->val1;
+        data->max_tap_interval = val->val2;
+        LOG_ERR("Seted min_tap_interval: %d, max_tap_interval: %d", data->min_tap_interval, data->max_tap_interval);
+        return 0;
+    }
+
+    if (chan == SHOCK_SENSOR_CHANNEL_MIN_COARSERING_INTERVAL && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
+        data->min_coarsering_interval = val->val1;
+        LOG_ERR("Seted min_coarsering_interval: %d", data->min_coarsering_interval);
+        return 0;
+    }
+
+    if (chan == SHOCK_SENSOR_CHANNEL_ACTIVE && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
+        data->active = val->val1;
+        LOG_ERR("Seted active: %d", data->active);
         return 0;
     }
 
@@ -406,7 +426,13 @@ static void adc_vbus_work_handler(struct k_work *work)
                 //     .chan = SENSOR_CHAN_PROX,
                 //     .type = SENSOR_TRIG_THRESHOLD,
                 // };
-                data->main_handler(dev, data->main_trigger);
+                if (data->active) {
+                    register_tap(data);
+                    data->warn_handler(dev, data->warn_trigger);
+                    k_timer_start(&data->reset_timer, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
+                } else {
+                    printk("Tap detected, but sensor is inactive");
+                }
             }
         } 
     } else if(amplitude_abs > data->treshold_warn) {
@@ -419,7 +445,14 @@ static void adc_vbus_work_handler(struct k_work *work)
                 //     .chan = SENSOR_CHAN_PROX,
                 //     .type = SENSOR_TRIG_TAP,
                 // };
-                data->warn_handler(dev, data->warn_trigger);
+                if (data->active) {
+                    register_tap(data);
+                    data->warn_handler(dev, data->warn_trigger);
+                    k_timer_start(&data->reset_timer, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
+                } else {
+                    printk("Tap detected, but sensor is inactive");
+                }
+                
                 // LOG_ERR("Debug counter: %d", debug_counter);
                 // debug_counter = 0;
             }
@@ -549,14 +582,65 @@ static int sensor_init(const struct device *dev)
     // k_work_init_delayable(&data->dwork, adc_vbus_work_handler);
     // // Перший запуск зробимо з системної черги
     // k_work_schedule(&data->dwork, K_MSEC(config->sensor.sampling_period_ms));
-
+            
 
     #ifdef CONFIG_PM_DEVICE_RUNTIME
         return pm_device_driver_init(dev, pm_action);
     #else
+        data->last_tap_time = k_uptime_get();
+        k_timer_init(&data->reset_timer, reset_timer_handler, NULL);
+        k_timer_user_data_set(&data->reset_timer, (void *)dev);
         return 0;
     #endif
 }
+
+void reset_timer_handler(struct k_timer *timer)
+{
+    struct device *dev = k_timer_user_data_get(timer);
+    if (!dev) {
+        printk("Device is NULL in timer handler!");
+        return;
+    }
+
+    struct sensor_data *data = dev->data;
+
+    printk("Tap count: %d\n", data->tap_count);
+    data->tap_count = 0;
+
+    sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->treshhold_warn_initial, data->treshhold_main_initial });
+}
+
+void coarsering(struct sensor_data *data)
+{
+    if (k_uptime_get() - data->last_coarsering_time < data->min_coarsering_interval) return;
+    int prev_main = data->treshold_main;
+    int prev_warn = data->treshold_warn;
+    data->treshold_main = data->treshold_main * (100 + data->coarsering_main_percents) / 100;
+    data->treshold_warn = data->treshold_warn * (100 + data->coarsering_warn_percents) / 100;
+    if (data->treshold_main > data->threshold_main_max) {
+        data->treshold_main = data->threshold_main_max;
+    }
+    if (data->treshold_warn > data->threshold_warn_max) {
+        data->treshold_warn = data->threshold_warn_max;
+    }
+    if (data->treshold_main == prev_main && data->treshold_warn == prev_warn) return;
+    sensor_attr_set(data->dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->treshold_warn, data->treshold_main });
+    data->last_coarsering_time = k_uptime_get();
+}
+
+void register_tap(struct sensor_data *data)
+{
+    int64_t current_time = k_uptime_get();
+    data->tap_count++;
+    if (current_time - data->last_tap_time < data->min_tap_interval) {
+        printk("Warning: Possible abuse detected, taps too frequent\n");
+    } else if (data->tap_count > 1) {
+        coarsering(data);
+    }
+    data->last_tap_time = current_time;
+}
+
+
 
 #define _INIT(inst)                                                                         \
     static struct sensor_data sensor_##inst##_data;                                       \
