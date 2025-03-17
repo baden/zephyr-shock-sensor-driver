@@ -29,30 +29,39 @@ struct sensor_data {
     const struct sensor_trigger *warn_trigger;
     sensor_trigger_handler_t main_handler;
     const struct sensor_trigger *main_trigger;
+
+    int warn_zones[16];
+    int main_zones[16];
+    int selected_warn_zone;
+    int selected_main_zone;
+    int current_warn_zone;
+    int current_main_zone;
+
     int treshold_warn;
     int treshold_main;
-    int treshhold_warn_initial;
-    int treshhold_main_initial;
-    int threshold_warn_max;
-    int threshold_main_max;
-    int tap_count;
-    int min_coarsering_interval;
+
+    int warn_count;
+    int main_count;
+
     int min_tap_interval;
     int max_tap_interval;
-    int coarsering_warn_percents;
-    int coarsering_main_percents;
-    int64_t last_coarsering_time;
-    int64_t last_tap_time;
-    struct k_timer reset_timer;
+
+    int64_t last_tap_time_warn;
+    int64_t last_tap_time_main;
+
+    int min_coarsering_interval;
+    int64_t last_coarsering_time_warn;
+    int64_t last_coarsering_time_main;
+
+    struct k_timer reset_timer_warn;
+    struct k_timer reset_timer_main;
+
     bool active;
 };
 
 enum shock_sensor_channel {
-    SHOCK_SENSOR_CHANNEL_TRESHHOLDS_INITIAL=65,
-    SHOCK_SENSOR_CHANNEL_TAP_MIN_MAX_INTERVALS,
+    SHOCK_SENSOR_CHANNEL_TAP_MIN_MAX_INTERVALS=65,
     SHOCK_SENSOR_CHANNEL_MIN_COARSERING_INTERVAL,
-    SHOCK_SENSOR_CHANNEL_THRESHHOLDS_WARN_MAIN_MAX,
-    SHOCK_SENSOR_CHANNEL_COARSING_WARN_MAIN_PERCENRS,
     SHOCK_SENSOR_CHANNEL_ACTIVE,
 };
 
@@ -93,4 +102,5 @@ __subsystem struct shock_sensor_driver_api {
     sensor_submit_t submit;
 };
 
-void reset_timer_handler(struct k_timer *);
+void reset_timer_handler_main(struct k_timer *);
+void reset_timer_handler_warn(struct k_timer *);

@@ -119,31 +119,7 @@ static int attr_set(const struct device *dev,
     if (chan == SENSOR_CHAN_PROX && attr == SENSOR_ATTR_UPPER_THRESH) {
         data->treshold_warn = val->val1;
         data->treshold_main = val->val2;
-        data->tap_count = 0;
-        data->last_coarsering_time = k_uptime_get();
         LOG_ERR("Seted treshold_warn: %d, treshold_main: %d", data->treshold_warn, data->treshold_main);
-        return 0;
-    }
-
-    if (chan == SHOCK_SENSOR_CHANNEL_THRESHHOLDS_WARN_MAIN_MAX && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
-        data->threshold_warn_max = val->val1;
-        data->threshold_main_max = val->val2;
-        LOG_ERR("Seted threshold_warn_max: %d, threshold_main_max: %d", data->threshold_warn_max, data->threshold_main_max);
-        return 0;
-    }
-
-    if (chan == SHOCK_SENSOR_CHANNEL_COARSING_WARN_MAIN_PERCENRS && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
-        data->coarsering_warn_percents = val->val1;
-        data->coarsering_main_percents = val->val2;
-        LOG_ERR("Seted coarsering_warn_percents: %d, coarsering_main_percents: %d", data->coarsering_warn_percents, data->coarsering_main_percents);
-        return 0;
-    }
-
-
-    if (chan == SHOCK_SENSOR_CHANNEL_TRESHHOLDS_INITIAL && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
-        data->treshhold_warn_initial = val->val1;
-        data->treshhold_main_initial = val->val2;
-        LOG_ERR("Seted treshhold_warn_initial: %d, treshhold_main_initial: %d", data->treshhold_warn_initial, data->treshhold_main_initial);
         return 0;
     }
 
@@ -427,9 +403,10 @@ static void adc_vbus_work_handler(struct k_work *work)
                 //     .type = SENSOR_TRIG_THRESHOLD,
                 // };
                 if (data->active) {
-                    register_tap(data);
-                    data->warn_handler(dev, data->warn_trigger);
-                    k_timer_start(&data->reset_timer, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
+                    register_tap_main(data);
+                    data->main_handler(dev, data->main_trigger);
+                    k_timer_start(&data->reset_timer_main, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
+                    printk("amplitude: %d\n", amplitude_abs);
                 } else {
                     printk("Tap detected, but sensor is inactive");
                 }
@@ -446,9 +423,10 @@ static void adc_vbus_work_handler(struct k_work *work)
                 //     .type = SENSOR_TRIG_TAP,
                 // };
                 if (data->active) {
-                    register_tap(data);
+                    register_tap_warn(data);
                     data->warn_handler(dev, data->warn_trigger);
-                    k_timer_start(&data->reset_timer, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
+                    k_timer_start(&data->reset_timer_warn, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
+                    printk("amplitude: %d\n", amplitude_abs);
                 } else {
                     printk("Tap detected, but sensor is inactive");
                 }
@@ -587,14 +565,19 @@ static int sensor_init(const struct device *dev)
     #ifdef CONFIG_PM_DEVICE_RUNTIME
         return pm_device_driver_init(dev, pm_action);
     #else
-        data->last_tap_time = k_uptime_get();
-        k_timer_init(&data->reset_timer, reset_timer_handler, NULL);
-        k_timer_user_data_set(&data->reset_timer, (void *)dev);
+        data->last_tap_time_warn = k_uptime_get();
+        data->last_tap_time_main = k_uptime_get();
+        
+        k_timer_init(&data->reset_timer_warn, reset_timer_handler_warn, NULL);
+        k_timer_user_data_set(&data->reset_timer_warn, (void *)dev);
+        k_timer_init(&data->reset_timer_main, reset_timer_handler_main, NULL);
+        k_timer_user_data_set(&data->reset_timer_main, (void *)dev);
+
         return 0;
     #endif
 }
 
-void reset_timer_handler(struct k_timer *timer)
+void reset_timer_handler_warn(struct k_timer *timer)
 {
     struct device *dev = k_timer_user_data_get(timer);
     if (!dev) {
@@ -604,40 +587,131 @@ void reset_timer_handler(struct k_timer *timer)
 
     struct sensor_data *data = dev->data;
 
-    printk("Tap count: %d\n", data->tap_count);
-    data->tap_count = 0;
-
-    sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->treshhold_warn_initial, data->treshhold_main_initial });
+    printk("Tap count: %d\n", data->warn_count);
+    data->warn_count = 0;
+    coarsering_warn(data, false);
+    // sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->treshhold_warn_initial, data->treshhold_main_initial });
 }
 
-void coarsering(struct sensor_data *data)
+void reset_timer_handler_main(struct k_timer *timer)
 {
-    if (k_uptime_get() - data->last_coarsering_time < data->min_coarsering_interval) return;
-    int prev_main = data->treshold_main;
-    int prev_warn = data->treshold_warn;
-    data->treshold_main = data->treshold_main * (100 + data->coarsering_main_percents) / 100;
-    data->treshold_warn = data->treshold_warn * (100 + data->coarsering_warn_percents) / 100;
-    if (data->treshold_main > data->threshold_main_max) {
-        data->treshold_main = data->threshold_main_max;
+    struct device *dev = k_timer_user_data_get(timer);
+    if (!dev) {
+        printk("Device is NULL in timer handler!");
+        return;
     }
-    if (data->treshold_warn > data->threshold_warn_max) {
-        data->treshold_warn = data->threshold_warn_max;
-    }
-    if (data->treshold_main == prev_main && data->treshold_warn == prev_warn) return;
-    sensor_attr_set(data->dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->treshold_warn, data->treshold_main });
-    data->last_coarsering_time = k_uptime_get();
+
+    struct sensor_data *data = dev->data;
+
+    printk("Tap count: %d\n", data->main_count);
+    data->main_count = 0;
+    coarsering_main(data, false);
+    // sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->treshhold_warn_initial, data->treshhold_main_initial });
 }
 
-void register_tap(struct sensor_data *data)
+void set_warn_zones(const struct device *dev, int *zones)
+{
+    struct sensor_data *data = dev->data;
+    for (int i = 0; i < 16; i++) {
+        data->warn_zones[i] = zones[i]; 
+    }
+}
+
+void set_main_zones(const struct device *dev, int zone)
+{
+    struct sensor_data *data = dev->data;
+    for (int i = 0; i < 16; i++) {
+        data->main_zones[i] = (data->warn_zones[zone] + i) * 5; 
+    }
+}
+
+void set_warn_zone(const struct device *dev, int zone)
+{
+    struct sensor_data *data = dev->data;
+    data->selected_warn_zone = zone;
+    data->current_warn_zone = zone;
+    set_main_zones(dev, zone);
+    sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[zone], .val2 = data->main_zones[data->current_main_zone] });
+}
+
+void change_warn_zone(const struct device *dev, int zone)
+{
+    struct sensor_data *data = dev->data;
+    data->current_warn_zone = zone;
+    sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[zone], .val2 = data->main_zones[data->current_main_zone] });
+}
+
+void set_main_zone(const struct device *dev, int zone)
+{
+    struct sensor_data *data = dev->data;
+    data->selected_main_zone = zone;
+    data->current_main_zone = zone;
+    sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[data->current_warn_zone], .val2 = data->main_zones[zone] });
+}
+
+void change_main_zone(const struct device *dev, int zone)
+{
+    struct sensor_data *data = dev->data;
+    data->current_main_zone = zone;
+    sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[data->current_warn_zone], .val2 = data->main_zones[zone] });
+}
+
+void coarsering_warn(struct sensor_data *data, bool increase)
+{
+    if (k_uptime_get() - data->last_coarsering_time_warn < data->min_coarsering_interval) return;
+    if (increase) {
+        if (data->current_warn_zone == 15) return;
+        data->current_warn_zone++;
+    } else {
+        if (data->current_warn_zone == data->selected_warn_zone) return;
+        data->current_warn_zone--;
+        k_timer_start(&data->reset_timer_warn, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
+    }
+    printk("coarsering_warn: %d\n", data->current_warn_zone);
+    sensor_attr_set(data->dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[data->current_warn_zone], .val2 = data->main_zones[data->current_main_zone] });
+    data->last_coarsering_time_warn = k_uptime_get();
+    data->warn_count = 0;
+}
+
+void coarsering_main(struct sensor_data *data, bool increase)
+{
+    if (k_uptime_get() - data->last_coarsering_time_main < data->min_coarsering_interval) return;
+    if (increase) {
+        if (data->current_main_zone == 15) return;
+        data->current_main_zone++;
+    } else {
+        if (data->current_main_zone == data->selected_main_zone) return;
+        data->current_main_zone--;
+        k_timer_start(&data->reset_timer_main, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
+    }
+    printk("coarsering_main: %d\n", data->current_main_zone);
+    sensor_attr_set(data->dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[data->current_warn_zone], .val2 = data->main_zones[data->current_main_zone] });
+    data->last_coarsering_time_main = k_uptime_get();
+    data->main_count = 0;
+}
+
+void register_tap_main(struct sensor_data *data)
 {
     int64_t current_time = k_uptime_get();
-    data->tap_count++;
-    if (current_time - data->last_tap_time < data->min_tap_interval) {
+    data->main_count++;
+    if (current_time - data->last_tap_time_main < data->min_tap_interval) {
         printk("Warning: Possible abuse detected, taps too frequent\n");
-    } else if (data->tap_count > 1) {
-        coarsering(data);
+    } else if (data->main_count > 1) {
+        coarsering_main(data, true);
     }
-    data->last_tap_time = current_time;
+    data->last_tap_time_main = current_time;
+}
+
+void register_tap_warn(struct sensor_data *data)
+{
+    int64_t current_time = k_uptime_get();
+    data->warn_count++;
+    if (current_time - data->last_tap_time_warn < data->min_tap_interval) {
+        printk("Warning: Possible abuse detected, taps too frequent\n");
+    } else if (data->warn_count > 1) {
+        coarsering_warn(data, true);
+    }
+    data->last_tap_time_warn = current_time;
 }
 
 
