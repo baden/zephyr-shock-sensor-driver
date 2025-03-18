@@ -142,6 +142,17 @@ static int attr_set(const struct device *dev,
         if (data->mode == SHOCK_SENSOR_MODE_ALARM) {
             k_timer_start(&data->reset_timer_alarm, K_SECONDS(val->val2), K_NO_WAIT);
         }
+        if (data->mode == SHOCK_SENSOR_MODE_DISARMED) {
+            data->current_warn_zone = data->selected_warn_zone;
+            data->current_main_zone = data->selected_main_zone;
+            set_zones(dev, data->current_warn_zone, data->current_main_zone);
+            LOG_ERR("Sensor is disarmed\n");
+        }
+        if (data->mode == SHOCK_SENSOR_MODE_ARMED) {
+            data->last_tap_time_warn = k_uptime_get();
+            data->last_tap_time_main = k_uptime_get();
+            LOG_ERR("Sensor is armed\n");
+        }
         return 0;
     }
 
@@ -595,6 +606,8 @@ void reset_timer_handler_warn(struct k_timer *timer)
 
     struct sensor_data *data = dev->data;
 
+    if (data->mode != SHOCK_SENSOR_MODE_ARMED) return;
+    
     // printk("Tap count warn: %d\n", data->warn_count);
     coarsering_warn(data, false);
 }
@@ -609,6 +622,7 @@ void reset_timer_handler_main(struct k_timer *timer)
 
     struct sensor_data *data = dev->data;
 
+    if (data->mode != SHOCK_SENSOR_MODE_ARMED) return;
     // printk("Tap count main: %d\n", data->main_count);
     coarsering_main(data, false);
 }
@@ -622,6 +636,8 @@ void reset_timer_handler_alarm(struct k_timer *timer)
     }
 
     struct sensor_data *data = dev->data;
+
+    if (data->mode != SHOCK_SENSOR_MODE_ALARM) return;
 
     data->mode = SHOCK_SENSOR_MODE_ARMED;
     LOG_ERR("Sensor is armed\n");
