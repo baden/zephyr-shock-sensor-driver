@@ -57,16 +57,24 @@ struct sensor_data {
     struct k_timer reset_timer_main;
 
     bool active;
+    int mode;
 };
 
 enum shock_sensor_channel {
     SHOCK_SENSOR_CHANNEL_TAP_MIN_MAX_INTERVALS=65,
     SHOCK_SENSOR_CHANNEL_MIN_COARSERING_INTERVAL,
     SHOCK_SENSOR_CHANNEL_ACTIVE,
+    SHOCK_SENSOR_MODE,
 };
 
 enum shock_sensor_attrs {
     SHOCK_SENSOR_SPECIAL_ATTRS=32,
+};
+
+enum shock_sensor_mode {
+    SHOCK_SENSOR_MODE_ARMED=0,
+    SHOCK_SENSOR_MODE_DISARMED,
+    SHOCK_SENSOR_MODE_ALARM,
 };
 
 struct shock_sensor_dt_spec {

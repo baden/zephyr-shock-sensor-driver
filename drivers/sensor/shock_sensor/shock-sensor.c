@@ -136,9 +136,9 @@ static int attr_set(const struct device *dev,
         return 0;
     }
 
-    if (chan == SHOCK_SENSOR_CHANNEL_ACTIVE && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
-        data->active = val->val1;
-        LOG_ERR("Seted active: %d", data->active);
+    if (chan == SHOCK_SENSOR_MODE && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
+        data->mode = val->val1;
+        LOG_ERR("Seted mode: %d", data->mode);
         return 0;
     }
 
@@ -402,7 +402,7 @@ static void adc_vbus_work_handler(struct k_work *work)
                 //     .chan = SENSOR_CHAN_PROX,
                 //     .type = SENSOR_TRIG_THRESHOLD,
                 // };
-                if (data->active) {
+                if (data->mode == 0) {
                     register_tap_main(data);
                     data->main_handler(dev, data->main_trigger);
                     k_timer_start(&data->reset_timer_main, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
@@ -422,7 +422,7 @@ static void adc_vbus_work_handler(struct k_work *work)
                 //     .chan = SENSOR_CHAN_PROX,
                 //     .type = SENSOR_TRIG_TAP,
                 // };
-                if (data->active) {
+                if (data->mode == 0) {
                     register_tap_warn(data);
                     data->warn_handler(dev, data->warn_trigger);
                     k_timer_start(&data->reset_timer_warn, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
