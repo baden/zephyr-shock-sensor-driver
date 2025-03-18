@@ -79,6 +79,7 @@ enum shock_sensor_attrs {
 enum shock_sensor_mode {
     SHOCK_SENSOR_MODE_ARMED=0,
     SHOCK_SENSOR_MODE_DISARMED,
+    SHOCK_SENSOR_MODE_TURN_OFF,
     SHOCK_SENSOR_MODE_ALARM,
 };
 

@@ -175,7 +175,7 @@ static int attr_set(const struct device *dev,
             LOG_ERR("Entering alarm mode for %d seconds\n", val->val2);
             k_timer_start(&data->reset_timer_alarm, K_SECONDS(val->val2), K_NO_WAIT);
         }
-        if (data->mode == SHOCK_SENSOR_MODE_DISARMED) {
+        if (data->mode == SHOCK_SENSOR_MODE_DISARMED || data->mode == SHOCK_SENSOR_MODE_TURN_OFF) {
             data->current_warn_zone = data->selected_warn_zone;
             data->current_main_zone = data->selected_main_zone;
             set_zones(dev, data->current_warn_zone, data->current_main_zone);
