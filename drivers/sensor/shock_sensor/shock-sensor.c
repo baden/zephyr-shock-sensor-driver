@@ -123,15 +123,47 @@ static int attr_set(const struct device *dev,
         return 0;
     }
 
+    if (chan == SHOCK_SENSOR_CHANNEL_WARN_ZONE && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
+        data->current_warn_zone = val->val1;
+        data->selected_warn_zone = val->val1;
+        create_main_zones(dev, val->val1);
+        data->current_main_zone = 0;
+        data->selected_main_zone = 0;
+        data->last_tap_time_warn = k_uptime_get();
+        data->last_tap_time_main = k_uptime_get();
+        data->last_coarsering_time_warn = k_uptime_get();
+        data->last_coarsering_time_main = k_uptime_get();
+        LOG_ERR("Seted warn_zone: %d", data->current_warn_zone);
+        set_zones(dev, data->current_warn_zone, data->current_main_zone);
+        return 0;
+    }
+
+    if (chan == SHOCK_SENSOR_CHANNEL_MAIN_ZONE && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
+        data->current_main_zone = val->val1;
+        data->selected_main_zone = val->val1;
+        data->current_warn_zone = data->selected_warn_zone;
+        data->last_tap_time_warn = k_uptime_get();
+        data->last_tap_time_main = k_uptime_get();
+        data->last_coarsering_time_warn = k_uptime_get();
+        data->last_coarsering_time_main = k_uptime_get();
+        LOG_ERR("Seted main_zone: %d", data->current_main_zone);
+        set_zones(dev, data->current_warn_zone, data->current_main_zone);
+        return 0;
+    }
+
     if (chan == SHOCK_SENSOR_CHANNEL_TAP_MIN_MAX_INTERVALS && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
         data->min_tap_interval = val->val1;
         data->max_tap_interval = val->val2;
+        data->last_tap_time_warn = k_uptime_get();
+        data->last_tap_time_main = k_uptime_get();
         LOG_ERR("Seted min_tap_interval: %d, max_tap_interval: %d", data->min_tap_interval, data->max_tap_interval);
         return 0;
     }
 
     if (chan == SHOCK_SENSOR_CHANNEL_MIN_COARSERING_INTERVAL && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
         data->min_coarsering_interval = val->val1;
+        data->last_coarsering_time_warn = k_uptime_get();
+        data->last_coarsering_time_main = k_uptime_get();
         LOG_ERR("Seted min_coarsering_interval: %d", data->min_coarsering_interval);
         return 0;
     }
@@ -140,6 +172,7 @@ static int attr_set(const struct device *dev,
         data->mode = val->val1;
         LOG_ERR("Seted mode: %d", data->mode);
         if (data->mode == SHOCK_SENSOR_MODE_ALARM) {
+            LOG_ERR("Entering alarm mode for %d seconds\n", val->val2);
             k_timer_start(&data->reset_timer_alarm, K_SECONDS(val->val2), K_NO_WAIT);
         }
         if (data->mode == SHOCK_SENSOR_MODE_DISARMED) {
@@ -151,6 +184,8 @@ static int attr_set(const struct device *dev,
         if (data->mode == SHOCK_SENSOR_MODE_ARMED) {
             data->last_tap_time_warn = k_uptime_get();
             data->last_tap_time_main = k_uptime_get();
+            data->last_coarsering_time_warn = k_uptime_get();
+            data->last_coarsering_time_main = k_uptime_get();
             LOG_ERR("Sensor is armed\n");
         }
         return 0;
@@ -422,7 +457,7 @@ static void adc_vbus_work_handler(struct k_work *work)
                     k_timer_start(&data->reset_timer_main, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
                     // printk("amplitude: %d\n", amplitude_abs);
                 } else {
-                    printk("Tap detected, but sensor is inactive");
+                    printk("Tap detected, but sensor is inactive\n");
                 }
             }
         } 
@@ -579,6 +614,7 @@ static int sensor_init(const struct device *dev)
     #ifdef CONFIG_PM_DEVICE_RUNTIME
         return pm_device_driver_init(dev, pm_action);
     #else
+        data->mode = SHOCK_SENSOR_MODE_DISARMED;
         set_warn_zones(dev);
         set_zones(dev, 0, 0);
 
@@ -607,7 +643,7 @@ void reset_timer_handler_warn(struct k_timer *timer)
     struct sensor_data *data = dev->data;
 
     if (data->mode != SHOCK_SENSOR_MODE_ARMED) return;
-    
+
     // printk("Tap count warn: %d\n", data->warn_count);
     coarsering_warn(data, false);
 }
