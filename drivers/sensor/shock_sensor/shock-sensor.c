@@ -457,7 +457,7 @@ static void adc_vbus_work_handler(struct k_work *work)
                     k_timer_start(&data->reset_timer_main, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
                     // printk("amplitude: %d\n", amplitude_abs);
                 } else {
-                    LOG_ERR("Tap detected, but sensor is inactive\n");
+                    LOG_ERR("Tap detected, but sensor is disabled");
                 }
             }
         } 
@@ -477,7 +477,7 @@ static void adc_vbus_work_handler(struct k_work *work)
                     k_timer_start(&data->reset_timer_warn, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
                     // printk("amplitude: %d\n", amplitude_abs);
                 } else {
-                    LOG_ERR("Tap detected, but sensor is inactive\n");
+                    LOG_ERR("Tap detected, but sensor is disabled");
                 }
                 
                 // LOG_ERR("Debug counter: %d", debug_counter);
