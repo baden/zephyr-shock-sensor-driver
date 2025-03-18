@@ -742,10 +742,18 @@ void coarsering_warn(struct sensor_data *data, bool increase)
 {
     if (k_uptime_get() - data->last_coarsering_time_warn < data->min_coarsering_interval) return;
     if (increase) {
-        if (data->current_warn_zone == 15) return;
+        if (data->current_warn_zone == 15) 
+        {
+            data->last_coarsering_time_warn = k_uptime_get();
+            return;
+        }
         data->current_warn_zone++;
     } else {
-        if (data->current_warn_zone == data->selected_warn_zone) return;
+        if (data->current_warn_zone == data->selected_warn_zone)
+        {
+            data->last_coarsering_time_warn = k_uptime_get();
+            return;
+        }
         data->current_warn_zone--;
         k_timer_start(&data->reset_timer_warn, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
     }
@@ -759,10 +767,18 @@ void coarsering_main(struct sensor_data *data, bool increase)
 {
     if (k_uptime_get() - data->last_coarsering_time_main < data->min_coarsering_interval) return;
     if (increase) {
-        if (data->current_main_zone == 15) return;
+        if (data->current_main_zone == 15) 
+        {
+            data->last_coarsering_time_main = k_uptime_get();
+            return;
+        }
         data->current_main_zone++;
     } else {
-        if (data->current_main_zone == data->selected_main_zone) return;
+        if (data->current_main_zone == data->selected_main_zone) 
+        {
+            data->last_coarsering_time_main = k_uptime_get();
+            return;
+        }
         data->current_main_zone--;
         k_timer_start(&data->reset_timer_main, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
     }
