@@ -406,7 +406,7 @@ static void adc_vbus_work_handler(struct k_work *work)
                     register_tap_main(data);
                     data->main_handler(dev, data->main_trigger);
                     k_timer_start(&data->reset_timer_main, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
-                    printk("amplitude: %d\n", amplitude_abs);
+                    // printk("amplitude: %d\n", amplitude_abs);
                 } else {
                     printk("Tap detected, but sensor is inactive");
                 }
@@ -426,7 +426,7 @@ static void adc_vbus_work_handler(struct k_work *work)
                     register_tap_warn(data);
                     data->warn_handler(dev, data->warn_trigger);
                     k_timer_start(&data->reset_timer_warn, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
-                    printk("amplitude: %d\n", amplitude_abs);
+                    // printk("amplitude: %d\n", amplitude_abs);
                 } else {
                     printk("Tap detected, but sensor is inactive");
                 }
@@ -587,7 +587,7 @@ void reset_timer_handler_warn(struct k_timer *timer)
 
     struct sensor_data *data = dev->data;
 
-    printk("Tap count warn: %d\n", data->warn_count);
+    // printk("Tap count warn: %d\n", data->warn_count);
     coarsering_warn(data, false);
 }
 
@@ -601,7 +601,7 @@ void reset_timer_handler_main(struct k_timer *timer)
 
     struct sensor_data *data = dev->data;
 
-    printk("Tap count main: %d\n", data->main_count);
+    // printk("Tap count main: %d\n", data->main_count);
     coarsering_main(data, false);
 }
 
