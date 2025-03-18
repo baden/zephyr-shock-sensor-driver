@@ -124,8 +124,8 @@ static int attr_set(const struct device *dev,
     }
 
     if (chan == SHOCK_SENSOR_CHANNEL_WARN_ZONE && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
-        data->current_warn_zone = val->val1;
-        data->selected_warn_zone = val->val1;
+        data->current_warn_zone = 15 - val->val1; 
+        data->selected_warn_zone = data->current_warn_zone;
         create_main_zones(dev, val->val1);
         data->current_main_zone = 0;
         data->selected_main_zone = 0;
@@ -139,8 +139,8 @@ static int attr_set(const struct device *dev,
     }
 
     if (chan == SHOCK_SENSOR_CHANNEL_MAIN_ZONE && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
-        data->current_main_zone = val->val1;
-        data->selected_main_zone = val->val1;
+        data->current_main_zone = 15 - val->val1;
+        data->selected_main_zone = data->current_main_zone;
         data->current_warn_zone = data->selected_warn_zone;
         data->last_tap_time_warn = k_uptime_get();
         data->last_tap_time_main = k_uptime_get();
