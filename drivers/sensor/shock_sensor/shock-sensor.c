@@ -587,10 +587,8 @@ void reset_timer_handler_warn(struct k_timer *timer)
 
     struct sensor_data *data = dev->data;
 
-    printk("Tap count: %d\n", data->warn_count);
-    data->warn_count = 0;
+    printk("Tap count warn: %d\n", data->warn_count);
     coarsering_warn(data, false);
-    // sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->treshhold_warn_initial, data->treshhold_main_initial });
 }
 
 void reset_timer_handler_main(struct k_timer *timer)
@@ -603,10 +601,8 @@ void reset_timer_handler_main(struct k_timer *timer)
 
     struct sensor_data *data = dev->data;
 
-    printk("Tap count: %d\n", data->main_count);
-    data->main_count = 0;
+    printk("Tap count main: %d\n", data->main_count);
     coarsering_main(data, false);
-    // sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->treshhold_warn_initial, data->treshhold_main_initial });
 }
 
 void set_warn_zones(const struct device *dev, int *zones)
