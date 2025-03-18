@@ -139,6 +139,9 @@ static int attr_set(const struct device *dev,
     if (chan == SHOCK_SENSOR_MODE && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
         data->mode = val->val1;
         LOG_ERR("Seted mode: %d", data->mode);
+        if (data->mode == SHOCK_SENSOR_MODE_ALARM) {
+            k_timer_start(&data->reset_timer_alarm, K_SECONDS(val->val2), K_NO_WAIT);
+        }
         return 0;
     }
 
@@ -572,6 +575,8 @@ static int sensor_init(const struct device *dev)
         k_timer_user_data_set(&data->reset_timer_warn, (void *)dev);
         k_timer_init(&data->reset_timer_main, reset_timer_handler_main, NULL);
         k_timer_user_data_set(&data->reset_timer_main, (void *)dev);
+        k_timer_init(&data->reset_timer_alarm, reset_timer_handler_alarm, NULL);
+        k_timer_user_data_set(&data->reset_timer_alarm, (void *)dev);
 
         return 0;
     #endif
@@ -603,6 +608,20 @@ void reset_timer_handler_main(struct k_timer *timer)
 
     // printk("Tap count main: %d\n", data->main_count);
     coarsering_main(data, false);
+}
+
+void reset_timer_handler_alarm(struct k_timer *timer)
+{
+    struct device *dev = k_timer_user_data_get(timer);
+    if (!dev) {
+        printk("Device is NULL in timer handler!");
+        return;
+    }
+
+    struct sensor_data *data = dev->data;
+
+    data->mode = SHOCK_SENSOR_MODE_ARMED;
+    printk("Sensor is armed\n");
 }
 
 void set_zones(const struct device *dev, int warn_zone, int main_zone)

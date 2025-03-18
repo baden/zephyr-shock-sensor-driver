@@ -55,6 +55,7 @@ struct sensor_data {
 
     struct k_timer reset_timer_warn;
     struct k_timer reset_timer_main;
+    struct k_timer reset_timer_alarm;
 
     bool active;
     int mode;
@@ -65,6 +66,8 @@ enum shock_sensor_channel {
     SHOCK_SENSOR_CHANNEL_MIN_COARSERING_INTERVAL,
     SHOCK_SENSOR_CHANNEL_ACTIVE,
     SHOCK_SENSOR_MODE,
+    SHOCK_SENSOR_CHANNEL_WARN_ZONE,
+    SHOCK_SENSOR_CHANNEL_MAIN_ZONE,
 };
 
 enum shock_sensor_attrs {
@@ -112,3 +115,4 @@ __subsystem struct shock_sensor_driver_api {
 
 void reset_timer_handler_main(struct k_timer *);
 void reset_timer_handler_warn(struct k_timer *);
+void reset_timer_handler_alarm(struct k_timer *);
