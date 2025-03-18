@@ -35,9 +35,9 @@ static int shock_init()
     sensor_attr_set(dev, SHOCK_SENSOR_CHANNEL_TAP_MIN_MAX_INTERVALS, SHOCK_SENSOR_SPECIAL_ATTRS, &(struct sensor_value){ .val1 = 5000, .val2 = 30 });
     //задаємо мінімальний інтервал між загрубленнями (c)
     sensor_attr_set(dev, SHOCK_SENSOR_CHANNEL_MIN_COARSERING_INTERVAL, SHOCK_SENSOR_SPECIAL_ATTRS, &(struct sensor_value){ .val1 = 30, .val2 = 0 });
-    //задаємо зони попередження
+    //задаємо зону попередження
     sensor_attr_set(dev, SHOCK_SENSOR_CHANNEL_WARN_ZONE, SHOCK_SENSOR_SPECIAL_ATTRS, &(struct sensor_value){ .val1 = 0, .val2 = 0 });
-    //задаємо основні зони
+    //задаємо основну зону
     sensor_attr_set(dev, SHOCK_SENSOR_CHANNEL_MAIN_ZONE, SHOCK_SENSOR_SPECIAL_ATTRS, &(struct sensor_value){ .val1 = 0, .val2 = 0 });
     //задаємо режим
     sensor_attr_set(dev, SHOCK_SENSOR_MODE, SHOCK_SENSOR_SPECIAL_ATTRS, &(struct sensor_value){ .val1 = SHOCK_SENSOR_MODE_DISARMED, .val2 = 30 });
