@@ -30,11 +30,17 @@ static int shock_init()
         printk("ADC VBUS controller device %s not ready\n", dev->name);
         return -ENODEV;
     }
-
-    int warn_zone = 10;
-    int main_zone = 60;
-    struct sensor_value val = { .val1 = warn_zone, .val2 = main_zone };
-    sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &val);
+ 
+    //задаємо мінімальний інтервал між спрацьовуваннями (мс) і максимальний інтервал між спрацьовуваннями (с) при якому скидається загрублення
+    sensor_attr_set(dev, SHOCK_SENSOR_CHANNEL_TAP_MIN_MAX_INTERVALS, SHOCK_SENSOR_SPECIAL_ATTRS, &(struct sensor_value){ .val1 = 5000, .val2 = 30 });
+    //задаємо мінімальний інтервал між загрубленнями (c)
+    sensor_attr_set(dev, SHOCK_SENSOR_CHANNEL_MIN_COARSERING_INTERVAL, SHOCK_SENSOR_SPECIAL_ATTRS, &(struct sensor_value){ .val1 = 30, .val2 = 0 });
+    //задаємо зону попередження
+    sensor_attr_set(dev, SHOCK_SENSOR_CHANNEL_WARN_ZONE, SHOCK_SENSOR_SPECIAL_ATTRS, &(struct sensor_value){ .val1 = 0, .val2 = 0 });
+    //задаємо основну зону
+    sensor_attr_set(dev, SHOCK_SENSOR_CHANNEL_MAIN_ZONE, SHOCK_SENSOR_SPECIAL_ATTRS, &(struct sensor_value){ .val1 = 0, .val2 = 0 });
+    //задаємо режим
+    sensor_attr_set(dev, SHOCK_SENSOR_MODE, SHOCK_SENSOR_SPECIAL_ATTRS, &(struct sensor_value){ .val1 = SHOCK_SENSOR_MODE_DISARMED, .val2 = 30 });
 
     int rc = sensor_trigger_set(dev, &trig_warn, sensor_warn_handler);
     rc = sensor_trigger_set(dev, &trig_main, sensor_main_handler);
