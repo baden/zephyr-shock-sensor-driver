@@ -605,6 +605,18 @@ void reset_timer_handler_main(struct k_timer *timer)
     coarsering_main(data, false);
 }
 
+void set_zones(const struct device *dev, int warn_zone, int main_zone)
+{
+    struct sensor_data *data = dev->data;
+    
+    data->selected_warn_zone = warn_zone;
+    data->current_warn_zone = warn_zone;
+    create_main_zones(dev, warn_zone);
+    data->selected_main_zone = main_zone;
+    data->current_main_zone = main_zone;
+    sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[warn_zone], .val2 = data->main_zones[main_zone] });
+}
+
 void set_warn_zones(const struct device *dev, int *zones)
 {
     struct sensor_data *data = dev->data;
@@ -613,7 +625,7 @@ void set_warn_zones(const struct device *dev, int *zones)
     }
 }
 
-void set_main_zones(const struct device *dev, int zone)
+void create_main_zones(const struct device *dev, int zone)
 {
     struct sensor_data *data = dev->data;
     for (int i = 0; i < 16; i++) {
@@ -626,7 +638,7 @@ void set_warn_zone(const struct device *dev, int zone)
     struct sensor_data *data = dev->data;
     data->selected_warn_zone = zone;
     data->current_warn_zone = zone;
-    set_main_zones(dev, zone);
+    create_main_zones(dev, zone);
     sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[zone], .val2 = data->main_zones[data->current_main_zone] });
 }
 
@@ -663,7 +675,7 @@ void coarsering_warn(struct sensor_data *data, bool increase)
         data->current_warn_zone--;
         k_timer_start(&data->reset_timer_warn, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
     }
-    printk("coarsering_warn: %d\n", data->current_warn_zone);
+    // printk("coarsering_warn: %d\n", data->current_warn_zone);
     sensor_attr_set(data->dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[data->current_warn_zone], .val2 = data->main_zones[data->current_main_zone] });
     data->last_coarsering_time_warn = k_uptime_get();
     data->warn_count = 0;
@@ -680,7 +692,7 @@ void coarsering_main(struct sensor_data *data, bool increase)
         data->current_main_zone--;
         k_timer_start(&data->reset_timer_main, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
     }
-    printk("coarsering_main: %d\n", data->current_main_zone);
+    // printk("coarsering_main: %d\n", data->current_main_zone);
     sensor_attr_set(data->dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[data->current_warn_zone], .val2 = data->main_zones[data->current_main_zone] });
     data->last_coarsering_time_main = k_uptime_get();
     data->main_count = 0;
