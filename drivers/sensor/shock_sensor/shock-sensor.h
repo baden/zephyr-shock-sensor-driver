@@ -61,6 +61,8 @@ struct sensor_data {
     int mode;
 };
 
+static const int warn_zones_initial[16] = {4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19};
+
 enum shock_sensor_channel {
     SHOCK_SENSOR_CHANNEL_TAP_MIN_MAX_INTERVALS=65,
     SHOCK_SENSOR_CHANNEL_MIN_COARSERING_INTERVAL,

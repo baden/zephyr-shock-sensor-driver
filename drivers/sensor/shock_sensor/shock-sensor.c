@@ -568,6 +568,9 @@ static int sensor_init(const struct device *dev)
     #ifdef CONFIG_PM_DEVICE_RUNTIME
         return pm_device_driver_init(dev, pm_action);
     #else
+        set_warn_zones(dev);
+        set_zones(dev, 0, 0);
+
         data->last_tap_time_warn = k_uptime_get();
         data->last_tap_time_main = k_uptime_get();
         
@@ -621,7 +624,7 @@ void reset_timer_handler_alarm(struct k_timer *timer)
     struct sensor_data *data = dev->data;
 
     data->mode = SHOCK_SENSOR_MODE_ARMED;
-    printk("Sensor is armed\n");
+    LOG_ERR("Sensor is armed\n");
 }
 
 void set_zones(const struct device *dev, int warn_zone, int main_zone)
@@ -636,11 +639,11 @@ void set_zones(const struct device *dev, int warn_zone, int main_zone)
     sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[warn_zone], .val2 = data->main_zones[main_zone] });
 }
 
-void set_warn_zones(const struct device *dev, int *zones)
+void set_warn_zones(const struct device *dev)
 {
     struct sensor_data *data = dev->data;
     for (int i = 0; i < 16; i++) {
-        data->warn_zones[i] = zones[i]; 
+        data->warn_zones[i] = warn_zones_initial[i]; 
     }
 }
 
