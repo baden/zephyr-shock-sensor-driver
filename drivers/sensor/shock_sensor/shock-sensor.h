@@ -55,8 +55,6 @@ struct sensor_data {
     int64_t last_coarsering_time_warn;
     int64_t last_coarsering_time_main;
 
-    struct k_timer reset_timer_warn;
-    struct k_timer reset_timer_main;
     struct k_timer reset_timer_alarm;
 
     struct k_timer increase_sensivity_timer_warn;

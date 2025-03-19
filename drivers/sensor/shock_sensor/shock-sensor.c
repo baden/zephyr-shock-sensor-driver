@@ -14,7 +14,9 @@
 #include "shock-sensor.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
+
+// LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
+LOG_MODULE_REGISTER(shock_sensor, LOG_LEVEL_DBG);
 
 struct sensor_config {
     struct shock_sensor_dt_spec sensor;
@@ -119,13 +121,13 @@ static int attr_set(const struct device *dev,
     if (chan == SENSOR_CHAN_PROX && attr == SENSOR_ATTR_UPPER_THRESH) {
         data->treshold_warn = val->val1;
         data->treshold_main = val->val2;
-        LOG_ERR("Seted treshold_warn: %d, treshold_main: %d", data->treshold_warn, data->treshold_main);
+        LOG_INF("Seted treshold_warn: %d, treshold_main: %d", data->treshold_warn, data->treshold_main);
         return 0;
     }
 
     if (chan == SHOCK_SENSOR_INCREASE_SENSIVITY_INTERVAL && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
         data->increase_sensivity_interval = val->val1;
-        LOG_ERR("Seted increase_sensivity_interval: %d", data->increase_sensivity_interval);
+        LOG_INF("Seted increase_sensivity_interval: %d", data->increase_sensivity_interval);
         k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
         k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
         return 0;
@@ -141,7 +143,7 @@ static int attr_set(const struct device *dev,
         data->last_tap_time_main = k_uptime_get();
         data->last_coarsering_time_warn = k_uptime_get();
         data->last_coarsering_time_main = k_uptime_get();
-        LOG_ERR("Seted warn_zone: %d", data->current_warn_zone);
+        LOG_INF("Seted warn_zone: %d", data->current_warn_zone);
         set_zones(dev, data->current_warn_zone, data->current_main_zone);
         return 0;
     }
@@ -154,7 +156,7 @@ static int attr_set(const struct device *dev,
         data->last_tap_time_main = k_uptime_get();
         data->last_coarsering_time_warn = k_uptime_get();
         data->last_coarsering_time_main = k_uptime_get();
-        LOG_ERR("Seted main_zone: %d", data->current_main_zone);
+        LOG_INF("Seted main_zone: %d", data->current_main_zone);
         set_zones(dev, data->current_warn_zone, data->current_main_zone);
         return 0;
     }
@@ -164,7 +166,7 @@ static int attr_set(const struct device *dev,
         data->max_tap_interval = val->val2;
         data->last_tap_time_warn = k_uptime_get();
         data->last_tap_time_main = k_uptime_get();
-        LOG_ERR("Seted min_tap_interval: %d, max_tap_interval: %d", data->min_tap_interval, data->max_tap_interval);
+        LOG_INF("Seted min_tap_interval: %d, max_tap_interval: %d", data->min_tap_interval, data->max_tap_interval);
         return 0;
     }
 
@@ -172,15 +174,15 @@ static int attr_set(const struct device *dev,
         data->min_coarsering_interval = val->val1;
         data->last_coarsering_time_warn = k_uptime_get();
         data->last_coarsering_time_main = k_uptime_get();
-        LOG_ERR("Seted min_coarsering_interval: %d", data->min_coarsering_interval);
+        LOG_INF("Seted min_coarsering_interval: %d", data->min_coarsering_interval);
         return 0;
     }
 
     if (chan == SHOCK_SENSOR_MODE && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
         data->mode = val->val1;
-        LOG_ERR("Seted mode: %d", data->mode);
+        LOG_INF("Seted mode: %d", data->mode);
         if (data->mode == SHOCK_SENSOR_MODE_ALARM) {
-            LOG_ERR("Entering alarm mode for %d ms\n", val->val2);
+            LOG_INF("Entering alarm mode for %d ms", val->val2);
             k_timer_start(&data->reset_timer_alarm, K_MSEC(val->val2), K_NO_WAIT);
         }
         if (data->mode == SHOCK_SENSOR_MODE_ALARM_STOP) {
@@ -192,7 +194,7 @@ static int attr_set(const struct device *dev,
             data->current_main_zone = data->selected_main_zone;
             k_timer_stop(&data->reset_timer_alarm);
             set_zones(dev, data->current_warn_zone, data->current_main_zone);
-            LOG_ERR("Sensor is disarmed\n");
+            LOG_INF("Sensor is disarmed");
         }
         if (data->mode == SHOCK_SENSOR_MODE_ARMED) {
             data->last_tap_time_warn = k_uptime_get();
@@ -200,7 +202,7 @@ static int attr_set(const struct device *dev,
             data->last_coarsering_time_warn = k_uptime_get();
             data->last_coarsering_time_main = k_uptime_get();
             k_timer_stop(&data->reset_timer_alarm);
-            LOG_ERR("Sensor is armed\n");
+            LOG_INF("Sensor is armed");
         }
         return 0;
     }
@@ -468,10 +470,9 @@ static void adc_vbus_work_handler(struct k_work *work)
                 if (data->mode == 0) {
                     data->main_handler(dev, data->main_trigger);
                     register_tap_main(data);
-                    k_timer_start(&data->reset_timer_main, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
                     // printk("amplitude: %d\n", amplitude_abs);
                 } else {
-                    LOG_ERR("Tap detected, but sensor is disabled");
+                    LOG_INF("Tap detected, but sensor is disabled");
                 }
             }
         } 
@@ -488,10 +489,9 @@ static void adc_vbus_work_handler(struct k_work *work)
                 if (data->mode == 0) {
                     data->warn_handler(dev, data->warn_trigger);
                     register_tap_warn(data);
-                    k_timer_start(&data->reset_timer_warn, K_SECONDS(data->max_tap_interval), K_NO_WAIT);
                     // printk("amplitude: %d\n", amplitude_abs);
                 } else {
-                    LOG_ERR("Tap detected, but sensor is disabled");
+                    LOG_INF("Tap detected, but sensor is disabled");
                 }
                 
                 // LOG_ERR("Debug counter: %d", debug_counter);
@@ -534,7 +534,7 @@ static int sensor_init(const struct device *dev)
 {
     int ret = 0;
 
-    printk("==== shock_sensor_init(%s)\n", dev->name);
+    LOG_INF("==== shock_sensor_init(%s)\n", dev->name);
 
     const struct sensor_config *config = dev->config;
     struct sensor_data *data = dev->data;
@@ -591,7 +591,7 @@ static int sensor_init(const struct device *dev)
     // Use k_sys_work_q for the work queue
     data->workq = k_sys_work_q;
 
-    printk("==== shock_sensor period: %d ms\n", config->sensor.sampling_period_ms);
+    LOG_INF("==== shock_sensor period: %d ms\n", config->sensor.sampling_period_ms);
 
     #ifdef CONFIG_USE_SYS_WORK_Q
         k_work_init_delayable(&data->dwork, adc_vbus_work_handler);
@@ -635,10 +635,6 @@ static int sensor_init(const struct device *dev)
         data->last_tap_time_warn = k_uptime_get();
         data->last_tap_time_main = k_uptime_get();
         
-        k_timer_init(&data->reset_timer_warn, reset_timer_handler_warn, NULL);
-        k_timer_user_data_set(&data->reset_timer_warn, (void *)dev);
-        k_timer_init(&data->reset_timer_main, reset_timer_handler_main, NULL);
-        k_timer_user_data_set(&data->reset_timer_main, (void *)dev);
         k_timer_init(&data->reset_timer_alarm, reset_timer_handler_alarm, NULL);
         k_timer_user_data_set(&data->reset_timer_alarm, (void *)dev);
 
@@ -655,7 +651,7 @@ void reset_timer_handler_warn(struct k_timer *timer)
 {
     struct device *dev = k_timer_user_data_get(timer);
     if (!dev) {
-        printk("Device is NULL in timer handler!");
+        LOG_ERR("Device is NULL in timer handler!");
         return;
     }
 
@@ -671,7 +667,7 @@ void reset_timer_handler_main(struct k_timer *timer)
 {
     struct device *dev = k_timer_user_data_get(timer);
     if (!dev) {
-        printk("Device is NULL in timer handler!");
+        LOG_ERR("Device is NULL in timer handler!");
         return;
     }
 
@@ -686,7 +682,7 @@ void reset_timer_handler_alarm(struct k_timer *timer)
 {
     struct device *dev = k_timer_user_data_get(timer);
     if (!dev) {
-        printk("Device is NULL in timer handler!");
+        LOG_ERR("Device is NULL in timer handler!");
         return;
     }
 
@@ -695,14 +691,14 @@ void reset_timer_handler_alarm(struct k_timer *timer)
     if (data->mode != SHOCK_SENSOR_MODE_ALARM) return;
 
     data->mode = SHOCK_SENSOR_MODE_ARMED;
-    LOG_ERR("Sensor is armed\n");
+    LOG_INF("Sensor is armed");
 }
 
 void increase_sensivity_warn_handler(struct k_timer *timer)
 {
     struct device *dev = k_timer_user_data_get(timer);
     if (!dev) {
-        printk("Device is NULL in timer handler!");
+        LOG_ERR("Device is NULL in timer handler!");
         return;
     }
     struct sensor_data *data = dev->data;
@@ -715,7 +711,7 @@ void increase_sensivity_main_handler(struct k_timer *timer)
     struct device *dev = k_timer_user_data_get(timer);
     
     if (!dev) {
-        printk("Device is NULL in timer handler!");
+        LOG_ERR("Device is NULL in timer handler!");
         return;
     }
     struct sensor_data *data = dev->data;
@@ -826,7 +822,7 @@ void register_tap_main(struct sensor_data *data)
     int64_t current_time = k_uptime_get();
     data->main_count++;
     if (current_time - data->last_tap_time_main < data->min_tap_interval) {
-        printk("Warning: Possible abuse detected, taps too frequent\n");
+        LOG_INF("Warning: Possible abuse detected, taps too frequent\n");
     } 
     coarsering_main(data, true);
     data->last_tap_time_main = current_time;
@@ -837,7 +833,7 @@ void register_tap_warn(struct sensor_data *data)
     int64_t current_time = k_uptime_get();
     data->warn_count++;
     if (current_time - data->last_tap_time_warn < data->min_tap_interval) {
-        printk("Warning: Possible abuse detected, taps too frequent\n");
+        LOG_INF("Warning: Possible abuse detected, taps too frequent\n");
     } 
     coarsering_warn(data, true);
     data->last_tap_time_warn = current_time;
