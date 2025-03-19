@@ -160,7 +160,7 @@ static int attr_set(const struct device *dev,
         data->min_tap_interval = val->val1;
         data->last_tap_time_warn = k_uptime_get();
         data->last_tap_time_main = k_uptime_get();
-        LOG_INF("Seted min_tap_interval: %d", data->max_tap_interval);
+        LOG_INF("Seted min_tap_interval: %d", data->min_tap_interval);
         return 0;
     }
 
