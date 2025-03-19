@@ -49,6 +49,8 @@ struct sensor_data {
     int64_t last_tap_time_warn;
     int64_t last_tap_time_main;
 
+    int increase_sensivity_interval;
+
     int min_coarsering_interval;
     int64_t last_coarsering_time_warn;
     int64_t last_coarsering_time_main;
@@ -56,6 +58,9 @@ struct sensor_data {
     struct k_timer reset_timer_warn;
     struct k_timer reset_timer_main;
     struct k_timer reset_timer_alarm;
+
+    struct k_timer increase_sensivity_timer_warn;
+    struct k_timer increase_sensivity_timer_main;
 
     bool active;
     int mode;
@@ -69,6 +74,7 @@ enum shock_sensor_channel {
     SHOCK_SENSOR_MODE,
     SHOCK_SENSOR_CHANNEL_WARN_ZONE,
     SHOCK_SENSOR_CHANNEL_MAIN_ZONE,
+    SHOCK_SENSOR_INCREASE_SENSIVITY_INTERVAL,
 };
 
 enum shock_sensor_attrs {
@@ -80,6 +86,7 @@ enum shock_sensor_mode {
     SHOCK_SENSOR_MODE_DISARMED,
     SHOCK_SENSOR_MODE_TURN_OFF,
     SHOCK_SENSOR_MODE_ALARM,
+    SHOCK_SENSOR_MODE_ALARM_STOP,
 };
 
 struct shock_sensor_dt_spec {
@@ -118,3 +125,14 @@ __subsystem struct shock_sensor_driver_api {
 void reset_timer_handler_main(struct k_timer *);
 void reset_timer_handler_warn(struct k_timer *);
 void reset_timer_handler_alarm(struct k_timer *);
+
+void increase_sensivity_warn_handler(struct k_timer *);
+void increase_sensivity_main_handler(struct k_timer *);
+
+void set_zones(const struct device *dev, int warn_zone, int main_zone);
+void set_warn_zones(const struct device *dev);
+void create_main_zones(const struct device *dev, int zone);
+void coarsering_warn(struct sensor_data *data, bool increase);
+void coarsering_main(struct sensor_data *data, bool increase);
+void register_tap_main(struct sensor_data *data);
+void register_tap_warn(struct sensor_data *data);
