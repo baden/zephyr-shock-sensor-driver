@@ -16,7 +16,6 @@
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
-// LOG_MODULE_REGISTER(shock_sensor, LOG_LEVEL_DBG);
 
 struct sensor_config {
     struct shock_sensor_dt_spec sensor;
