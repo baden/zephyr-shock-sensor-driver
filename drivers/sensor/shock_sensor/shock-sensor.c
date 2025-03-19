@@ -140,8 +140,6 @@ static int attr_set(const struct device *dev,
         data->selected_main_zone = 0;
         data->last_tap_time_warn = k_uptime_get();
         data->last_tap_time_main = k_uptime_get();
-        data->last_coarsering_time_warn = k_uptime_get();
-        data->last_coarsering_time_main = k_uptime_get();
         LOG_INF("Seted warn_zone: %d", data->current_warn_zone);
         set_zones(dev, data->current_warn_zone, data->current_main_zone);
         return 0;
@@ -153,8 +151,6 @@ static int attr_set(const struct device *dev,
         data->current_warn_zone = data->selected_warn_zone;
         data->last_tap_time_warn = k_uptime_get();
         data->last_tap_time_main = k_uptime_get();
-        data->last_coarsering_time_warn = k_uptime_get();
-        data->last_coarsering_time_main = k_uptime_get();
         LOG_INF("Seted main_zone: %d", data->current_main_zone);
         set_zones(dev, data->current_warn_zone, data->current_main_zone);
         return 0;
@@ -166,14 +162,6 @@ static int attr_set(const struct device *dev,
         data->last_tap_time_warn = k_uptime_get();
         data->last_tap_time_main = k_uptime_get();
         LOG_INF("Seted min_tap_interval: %d, max_tap_interval: %d", data->min_tap_interval, data->max_tap_interval);
-        return 0;
-    }
-
-    if (chan == SHOCK_SENSOR_CHANNEL_MIN_COARSERING_INTERVAL && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
-        data->min_coarsering_interval = val->val1;
-        data->last_coarsering_time_warn = k_uptime_get();
-        data->last_coarsering_time_main = k_uptime_get();
-        LOG_INF("Seted min_coarsering_interval: %d", data->min_coarsering_interval);
         return 0;
     }
 
@@ -198,8 +186,6 @@ static int attr_set(const struct device *dev,
         if (data->mode == SHOCK_SENSOR_MODE_ARMED) {
             data->last_tap_time_warn = k_uptime_get();
             data->last_tap_time_main = k_uptime_get();
-            data->last_coarsering_time_warn = k_uptime_get();
-            data->last_coarsering_time_main = k_uptime_get();
             k_timer_stop(&data->reset_timer_alarm);
             LOG_INF("Sensor is armed");
         }
