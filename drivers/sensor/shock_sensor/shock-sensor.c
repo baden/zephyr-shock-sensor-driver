@@ -156,12 +156,11 @@ static int attr_set(const struct device *dev,
         return 0;
     }
 
-    if (chan == SHOCK_SENSOR_CHANNEL_TAP_MIN_MAX_INTERVALS && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
+    if (chan == SHOCK_SENSOR_CHANNEL_TAP_MIN_INTERVAL && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
         data->min_tap_interval = val->val1;
-        data->max_tap_interval = val->val2;
         data->last_tap_time_warn = k_uptime_get();
         data->last_tap_time_main = k_uptime_get();
-        LOG_INF("Seted min_tap_interval: %d, max_tap_interval: %d", data->min_tap_interval, data->max_tap_interval);
+        LOG_INF("Seted min_tap_interval: %d", data->max_tap_interval);
         return 0;
     }
 

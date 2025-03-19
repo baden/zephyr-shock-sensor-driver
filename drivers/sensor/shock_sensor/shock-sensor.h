@@ -44,7 +44,6 @@ struct sensor_data {
     int main_count;
 
     int min_tap_interval;
-    int max_tap_interval;
 
     int64_t last_tap_time_warn;
     int64_t last_tap_time_main;
@@ -63,7 +62,7 @@ struct sensor_data {
 static const int warn_zones_initial[16] = {4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19};
 
 enum shock_sensor_channel {
-    SHOCK_SENSOR_CHANNEL_TAP_MIN_MAX_INTERVALS=65,
+    SHOCK_SENSOR_CHANNEL_TAP_MIN_INTERVAL=65,
     SHOCK_SENSOR_MODE,
     SHOCK_SENSOR_CHANNEL_WARN_ZONE,
     SHOCK_SENSOR_CHANNEL_MAIN_ZONE,
