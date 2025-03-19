@@ -183,9 +183,14 @@ static int attr_set(const struct device *dev,
             LOG_ERR("Entering alarm mode for %d ms\n", val->val2);
             k_timer_start(&data->reset_timer_alarm, K_MSEC(val->val2), K_NO_WAIT);
         }
+        if (data->mode == SHOCK_SENSOR_MODE_ALARM_STOP) {
+            data->mode = SHOCK_SENSOR_MODE_ARMED;
+            k_timer_stop(&data->reset_timer_alarm);
+        }
         if (data->mode == SHOCK_SENSOR_MODE_DISARMED || data->mode == SHOCK_SENSOR_MODE_TURN_OFF) {
             data->current_warn_zone = data->selected_warn_zone;
             data->current_main_zone = data->selected_main_zone;
+            k_timer_stop(&data->reset_timer_alarm);
             set_zones(dev, data->current_warn_zone, data->current_main_zone);
             LOG_ERR("Sensor is disarmed\n");
         }
@@ -194,6 +199,7 @@ static int attr_set(const struct device *dev,
             data->last_tap_time_main = k_uptime_get();
             data->last_coarsering_time_warn = k_uptime_get();
             data->last_coarsering_time_main = k_uptime_get();
+            k_timer_stop(&data->reset_timer_alarm);
             LOG_ERR("Sensor is armed\n");
         }
         return 0;
@@ -701,9 +707,7 @@ void increase_sensivity_warn_handler(struct k_timer *timer)
     }
     struct sensor_data *data = dev->data;
     if (data->mode != SHOCK_SENSOR_MODE_ARMED) return;
-
     coarsering_warn(data, true);
-
 }
 
 void increase_sensivity_main_handler(struct k_timer *timer)
@@ -715,7 +719,9 @@ void increase_sensivity_main_handler(struct k_timer *timer)
         return;
     }
     struct sensor_data *data = dev->data;
-
+    if (data->mode != SHOCK_SENSOR_MODE_ARMED) return;
+    coarsering_main(data, true);
+    
 }
 
 void set_zones(const struct device *dev, int warn_zone, int main_zone)
@@ -792,9 +798,8 @@ void coarsering_warn(struct sensor_data *data, bool increase)
         }
         data->current_warn_zone--;
     }
-    // printk("coarsering_warn: %d\n", data->current_warn_zone);
+    k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
     sensor_attr_set(data->dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[data->current_warn_zone], .val2 = data->main_zones[data->current_main_zone] });
-    data->warn_count = 0;
 }
 
 void coarsering_main(struct sensor_data *data, bool increase)
@@ -812,9 +817,8 @@ void coarsering_main(struct sensor_data *data, bool increase)
         }
         data->current_main_zone--;
     }
-    // printk("coarsering_main: %d\n", data->current_main_zone);
+    k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
     sensor_attr_set(data->dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[data->current_warn_zone], .val2 = data->main_zones[data->current_main_zone] });
-    data->main_count = 0;
 }
 
 void register_tap_main(struct sensor_data *data)
@@ -823,9 +827,8 @@ void register_tap_main(struct sensor_data *data)
     data->main_count++;
     if (current_time - data->last_tap_time_main < data->min_tap_interval) {
         printk("Warning: Possible abuse detected, taps too frequent\n");
-    } else if (data->main_count > 0) {
-        coarsering_main(data, true);
-    }
+    } 
+    coarsering_main(data, true);
     data->last_tap_time_main = current_time;
 }
 
@@ -835,9 +838,8 @@ void register_tap_warn(struct sensor_data *data)
     data->warn_count++;
     if (current_time - data->last_tap_time_warn < data->min_tap_interval) {
         printk("Warning: Possible abuse detected, taps too frequent\n");
-    } else if (data->warn_count > 0) {
-        coarsering_warn(data, true);
-    }
+    } 
+    coarsering_warn(data, true);
     data->last_tap_time_warn = current_time;
 } 
 
