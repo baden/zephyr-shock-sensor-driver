@@ -687,7 +687,7 @@ void increase_sensivity_warn_handler(struct k_timer *timer)
     }
     struct sensor_data *data = dev->data;
     if (data->mode != SHOCK_SENSOR_MODE_ARMED) return;
-    coarsering_warn(data, true);
+    coarsering_warn(data, false);
 }
 
 void increase_sensivity_main_handler(struct k_timer *timer)
@@ -700,7 +700,7 @@ void increase_sensivity_main_handler(struct k_timer *timer)
     }
     struct sensor_data *data = dev->data;
     if (data->mode != SHOCK_SENSOR_MODE_ARMED) return;
-    coarsering_main(data, true);
+    coarsering_main(data, false);
     
 }
 
@@ -769,6 +769,7 @@ void coarsering_warn(struct sensor_data *data, bool increase)
         if (data->current_warn_zone == 15) 
         {
             LOG_INF("Warning: Minimum warn zone sensivity reached");
+            k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             return;
         }
         data->current_warn_zone++;
@@ -776,6 +777,7 @@ void coarsering_warn(struct sensor_data *data, bool increase)
         if (data->current_warn_zone == data->selected_warn_zone)
         {
             LOG_INF("Warning: Maximum or setted warn zone sensivity reached");
+            k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             return;
         }
         data->current_warn_zone--;
@@ -790,6 +792,7 @@ void coarsering_main(struct sensor_data *data, bool increase)
         if (data->current_main_zone == 15) 
         {
             LOG_INF("Warning: Minimum main zone sensivity reached");
+            k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             return;
         }
         data->current_main_zone++;
@@ -797,6 +800,7 @@ void coarsering_main(struct sensor_data *data, bool increase)
         if (data->current_main_zone == data->selected_main_zone) 
         {
             LOG_INF("Warning: Maximum or setted main zone sensivity reached");
+            k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             return;
         }
         data->current_main_zone--;
