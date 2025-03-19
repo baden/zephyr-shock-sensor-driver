@@ -768,12 +768,14 @@ void coarsering_warn(struct sensor_data *data, bool increase)
     if (increase) {
         if (data->current_warn_zone == 15) 
         {
+            LOG_INF("Warning: Minimum warn zone sensivity reached");
             return;
         }
         data->current_warn_zone++;
     } else {
         if (data->current_warn_zone == data->selected_warn_zone)
         {
+            LOG_INF("Warning: Maximum or setted warn zone sensivity reached");
             return;
         }
         data->current_warn_zone--;
@@ -787,12 +789,14 @@ void coarsering_main(struct sensor_data *data, bool increase)
     if (increase) {
         if (data->current_main_zone == 15) 
         {
+            LOG_INF("Warning: Minimum main zone sensivity reached");
             return;
         }
         data->current_main_zone++;
     } else {
         if (data->current_main_zone == data->selected_main_zone) 
         {
+            LOG_INF("Warning: Maximum or setted main zone sensivity reached");
             return;
         }
         data->current_main_zone--;
@@ -806,7 +810,7 @@ void register_tap_main(struct sensor_data *data)
     int64_t current_time = k_uptime_get();
     data->main_count++;
     if (current_time - data->last_tap_time_main < data->min_tap_interval) {
-        LOG_INF("Warning: Possible abuse detected, taps too frequent\n");
+        LOG_INF("Warning: Possible abuse detected, taps too frequent");
     } 
     coarsering_main(data, true);
     data->last_tap_time_main = current_time;
@@ -817,7 +821,7 @@ void register_tap_warn(struct sensor_data *data)
     int64_t current_time = k_uptime_get();
     data->warn_count++;
     if (current_time - data->last_tap_time_warn < data->min_tap_interval) {
-        LOG_INF("Warning: Possible abuse detected, taps too frequent\n");
+        LOG_INF("Warning: Possible abuse detected, taps too frequent");
     } 
     coarsering_warn(data, true);
     data->last_tap_time_warn = current_time;
