@@ -478,7 +478,7 @@ static void adc_vbus_work_handler(struct k_work *work)
                     LOG_INF("WARN amplitude: %d", amplitude_abs);
                     register_tap_warn(data);
                 } else {
-                    LOG_INF("WARN tap detected, but sensor is disabled %d");
+                    LOG_INF("WARN tap detected, but sensor is disabled %d", amplitude_abs );
                 }
                 
                 // LOG_ERR("Debug counter: %d", debug_counter);
