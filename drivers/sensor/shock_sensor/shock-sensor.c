@@ -814,7 +814,14 @@ void coarsering_warn(struct sensor_data *data, bool increase)
             k_timer_stop(&data->increase_sensivity_timer_warn);
             return;
         }
-        data->current_warn_zone--;
+        if (data->max_noise_level <= data->warn_zones[data->current_warn_zone - 1])
+        {
+            data->current_warn_zone--; 
+        } else {
+            LOG_INF("Warning: warn zone sensivity can`t be decreased due to noise level");
+            k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
+            return;
+        }
     }
     k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
     sensor_attr_set(data->dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[data->current_warn_zone], .val2 = data->main_zones[data->current_main_zone] });
@@ -837,7 +844,14 @@ void coarsering_main(struct sensor_data *data, bool increase)
             k_timer_stop(&data->increase_sensivity_timer_main);
             return;
         }
-        data->current_main_zone--;
+        if (data->max_noise_level <= data->main_zones[data->current_main_zone - 1])
+        {
+            data->current_main_zone--; 
+        } else {
+            LOG_INF("Warning: main zone sensivity can`t be decreased due to noise level");
+            k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
+            return;
+        }
     }
     k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
     sensor_attr_set(data->dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[data->current_warn_zone], .val2 = data->main_zones[data->current_main_zone] });
