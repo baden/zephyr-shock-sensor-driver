@@ -110,6 +110,9 @@ static int get(const struct device *dev, enum sensor_channel chan, struct sensor
     return ret;
 }
 
+// k_timer_stop(&data->increase_sensivity_timer_warn);
+// k_timer_stop(&data->increase_sensivity_timer_main);
+
 static int attr_set(const struct device *dev,
     enum sensor_channel chan,
     enum sensor_attribute attr,
@@ -171,6 +174,8 @@ static int attr_set(const struct device *dev,
             data->current_warn_zone = data->selected_warn_zone;
             data->current_main_zone = data->selected_main_zone;
             k_timer_stop(&data->reset_timer_alarm);
+            k_timer_stop(&data->increase_sensivity_timer_warn);
+            k_timer_stop(&data->increase_sensivity_timer_main);
             set_zones(dev, data->current_warn_zone, data->current_main_zone);
             LOG_INF("Sensor is disarmed");
         }
@@ -178,6 +183,8 @@ static int attr_set(const struct device *dev,
             data->last_tap_time_warn = k_uptime_get();
             data->last_tap_time_main = k_uptime_get();
             k_timer_stop(&data->reset_timer_alarm);
+            k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
+            k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             LOG_INF("Sensor is armed");
         }
         return 0;
