@@ -156,14 +156,6 @@ static int attr_set(const struct device *dev,
         return 0;
     }
 
-    if (chan == SHOCK_SENSOR_CHANNEL_TAP_MIN_INTERVAL && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
-        data->min_tap_interval = val->val1;
-        data->last_tap_time_warn = k_uptime_get();
-        data->last_tap_time_main = k_uptime_get();
-        LOG_INF("Seted min_tap_interval: %d", data->min_tap_interval);
-        return 0;
-    }
-
     if (chan == SHOCK_SENSOR_MODE && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
         data->mode = val->val1;
         LOG_INF("Seted mode: %d", data->mode);
@@ -812,23 +804,26 @@ void coarsering_main(struct sensor_data *data, bool increase)
 void register_tap_main(struct sensor_data *data)
 {
     int64_t current_time = k_uptime_get();
-    data->main_count++;
-    if (current_time - data->last_tap_time_main < data->min_tap_interval) {
-        LOG_INF("Warning: Possible abuse detected, taps too frequent");
-    } 
-    coarsering_main(data, true);
+    if (current_time - data->last_tap_time_main < MIN_TAP_INTERVAL) {
+        // LOG_INF("Warning: Possible abuse detected, taps too frequent");
+        return;
+    }
     data->last_tap_time_main = current_time;
+    data->main_count++;
+    coarsering_main(data, true);
+    
 }
 
 void register_tap_warn(struct sensor_data *data)
 {
     int64_t current_time = k_uptime_get();
-    data->warn_count++;
-    if (current_time - data->last_tap_time_warn < data->min_tap_interval) {
-        LOG_INF("Warning: Possible abuse detected, taps too frequent");
+    if (current_time - data->last_tap_time_warn < MIN_TAP_INTERVAL) {
+        // LOG_INF("Warning: Possible abuse detected, taps too frequent");
+        return;
     } 
-    coarsering_warn(data, true);
     data->last_tap_time_warn = current_time;
+    data->warn_count++;
+    coarsering_warn(data, true);
 } 
 
 

@@ -11,6 +11,8 @@
 #define SHOCK_SENSOR_ACTIVE 1
 #define SHOCK_SENSOR_INACTIVE 0
 #define CONFIG_SEQUENCE_SAMPLES 16
+#define MIN_TAP_INTERVAL 1000 // ms
+
 
 struct sensor_data {
     struct adc_sequence sequence;
@@ -62,8 +64,7 @@ struct sensor_data {
 static const int warn_zones_initial[16] = {4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19};
 
 enum shock_sensor_channel {
-    SHOCK_SENSOR_CHANNEL_TAP_MIN_INTERVAL=65,
-    SHOCK_SENSOR_MODE,
+    SHOCK_SENSOR_MODE=65,
     SHOCK_SENSOR_CHANNEL_WARN_ZONE,
     SHOCK_SENSOR_CHANNEL_MAIN_ZONE,
     SHOCK_SENSOR_INCREASE_SENSIVITY_INTERVAL,
