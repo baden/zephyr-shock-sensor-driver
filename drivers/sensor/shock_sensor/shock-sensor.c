@@ -762,7 +762,7 @@ void create_main_zones(const struct device *dev, int zone)
 {
     struct sensor_data *data = dev->data;
     for (int i = 0; i < 16; i++) {
-        data->main_zones[i] = (data->warn_zones[zone] + i) * 5; 
+        data->main_zones[i] = data->warn_zones[zone] * 2 + (i * 5); 
     }
 }
 

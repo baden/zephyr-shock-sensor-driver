@@ -66,7 +66,7 @@ struct sensor_data {
     int mode;
 };
 
-static const int warn_zones_initial[16] = {4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19};
+static const int warn_zones_initial[16] = {4, 5, 6, 8, 10, 12, 14, 17, 20, 23, 27, 32, 37, 43, 50, 60};
 
 enum shock_sensor_channel {
     SHOCK_SENSOR_MODE=65,
