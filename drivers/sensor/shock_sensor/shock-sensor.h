@@ -130,8 +130,13 @@ void increase_sensivity_main_handler(struct k_timer *);
 
 void set_zones(const struct device *dev, int warn_zone, int main_zone);
 void set_warn_zones(const struct device *dev);
+void set_warn_zone(const struct device *dev, int zone);
 void create_main_zones(const struct device *dev, int zone);
 void coarsering_warn(struct sensor_data *data, bool increase);
 void coarsering_main(struct sensor_data *data, bool increase);
 void register_tap_main(struct sensor_data *data);
 void register_tap_warn(struct sensor_data *data);
+void change_warn_zone(const struct device *dev, int zone);
+void set_main_zone(const struct device *dev, int zone);
+void change_main_zone(const struct device *dev, int zone);
+
