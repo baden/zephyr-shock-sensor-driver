@@ -456,10 +456,10 @@ static void adc_vbus_work_handler(struct k_work *work)
                 // };
                 if (data->mode == 0) {
                     data->main_handler(dev, data->main_trigger);
+                    LOG_INF("MAIN amplitude: %d\n", amplitude_abs);
                     register_tap_main(data);
-                    // printk("amplitude: %d\n", amplitude_abs);
                 } else {
-                    LOG_INF("Tap detected, but sensor is disabled");
+                    LOG_INF("MAIN tap detected, but sensor is disabled ", amplitude_abs);
                 }
             }
         } 
@@ -475,10 +475,10 @@ static void adc_vbus_work_handler(struct k_work *work)
                 // };
                 if (data->mode == 0) {
                     data->warn_handler(dev, data->warn_trigger);
+                    LOG_INF("WARN amplitude: %d\n", amplitude_abs);
                     register_tap_warn(data);
-                    // printk("amplitude: %d\n", amplitude_abs);
                 } else {
-                    LOG_INF("Tap detected, but sensor is disabled");
+                    LOG_INF("WARN tap detected, but sensor is disabled");
                 }
                 
                 // LOG_ERR("Debug counter: %d", debug_counter);
