@@ -590,18 +590,19 @@ static void adc_vbus_work_handler(struct k_work *work)
             }
         }
     } else  {
-        int64_t current_time = k_uptime_get();
+        if (data->mode == 0) {
+            int64_t current_time = k_uptime_get();
 
-        if ((current_time - data->max_noise_level_time) > data->noise_sampling_interval_msec) {
-            LOG_INF("Noise window reset. Previous max: %d", data->max_noise_level);
-            data->max_noise_level = amplitude_abs;
-            data->max_noise_level_time = current_time;
-        } else if (amplitude_abs > data->max_noise_level) {
-            data->max_noise_level = amplitude_abs;
-            data->max_noise_level_time = current_time;
-            LOG_INF("New max noise level: %d", data->max_noise_level);
-        }
-        
+            if ((current_time - data->max_noise_level_time) > data->noise_sampling_interval_msec) {
+                LOG_INF("Noise window reset. Previous max: %d", data->max_noise_level);
+                data->max_noise_level = amplitude_abs;
+                data->max_noise_level_time = current_time;
+            } else if (amplitude_abs > data->max_noise_level) {
+                data->max_noise_level = amplitude_abs;
+                data->max_noise_level_time = current_time;
+                LOG_INF("New max noise level: %d", data->max_noise_level);
+            }
+        }    
     }
 
 end:
