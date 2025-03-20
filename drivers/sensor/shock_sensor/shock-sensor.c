@@ -17,6 +17,79 @@
 
 LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
 
+#ifdef CONFIG_SEQUENCE_32BITS_REGISTERS
+    #define ADC_READING_TYPE uint32_t
+#else
+    #define ADC_READING_TYPE uint16_t
+#endif
+
+#define SHOCK_SENSOR_ACTIVE 1
+#define SHOCK_SENSOR_INACTIVE 0
+#define CONFIG_SEQUENCE_SAMPLES 16
+#define MIN_TAP_INTERVAL 1000 // ms
+
+
+struct sensor_data {
+    struct adc_sequence sequence;
+    k_timeout_t earliest_sample;
+    ADC_READING_TYPE raw[CONFIG_SEQUENCE_SAMPLES];
+
+    const struct device *dev;   // self reference
+    struct k_work_q workq;   /* work queue */
+    struct k_work_delayable dwork;  /* workers */
+
+    // #ifndef CONFIG_USE_SYS_WORK_Q
+    //     K_KERNEL_STACK_MEMBER(workq_stack, CONFIG_SENSOR_SHOCK_THREAD_STACK_SIZE);
+    // #endif
+    // struct k_poll_signal async_sig;
+    sensor_trigger_handler_t warn_handler;
+    const struct sensor_trigger *warn_trigger;
+    sensor_trigger_handler_t main_handler;
+    const struct sensor_trigger *main_trigger;
+
+    int warn_zones[16];
+    int main_zones[16];
+    int selected_warn_zone;
+    int selected_main_zone;
+    int current_warn_zone;
+    int current_main_zone;
+
+    int treshold_warn;
+    int treshold_main;
+
+    int warn_count;
+    int main_count;
+
+    int min_tap_interval;
+
+    int64_t last_tap_time_warn;
+    int64_t last_tap_time_main;
+
+    int64_t max_noise_level_time;
+    int64_t noise_sampling_interval_msec;
+    int64_t noise_sampling_interval_sec;
+    int max_noise_level;
+
+    int increase_sensivity_interval;
+
+    struct k_timer reset_timer_alarm;
+
+    struct k_timer increase_sensivity_timer_warn;
+    struct k_timer increase_sensivity_timer_main;
+
+    bool active;
+    int mode;
+};
+
+static const int warn_zones_initial[16] = {4, 5, 6, 8, 10, 12, 14, 17, 20, 23, 27, 32, 37, 43, 50, 60};
+
+
+
+struct shock_sensor_dt_spec {
+	const struct adc_dt_spec port;
+    uint32_t sampling_period_ms;
+};
+
 struct sensor_config {
     struct shock_sensor_dt_spec sensor;
     struct gpio_dt_spec gpio_power;
@@ -24,6 +97,19 @@ struct sensor_config {
     k_thread_stack_t *work_q_stack;
 	size_t work_q_stack_size;
 };
+
+static void reset_timer_handler_alarm(struct k_timer *);
+
+static void increase_sensivity_warn_handler(struct k_timer *);
+static void increase_sensivity_main_handler(struct k_timer *);
+
+static void set_zones(const struct device *dev, int warn_zone, int main_zone);
+static void set_warn_zones(const struct device *dev);
+static void create_main_zones(const struct device *dev, int zone);
+static void coarsering_warn(struct sensor_data *data, bool increase);
+static void coarsering_main(struct sensor_data *data, bool increase);
+static void register_tap_main(struct sensor_data *data);
+static void register_tap_warn(struct sensor_data *data);
 
 // #define CONFIG_USE_SYS_WORK_Q
 // #define CONFIG_USE_ASYNC_ADC_READ
@@ -477,7 +563,7 @@ static void adc_vbus_work_handler(struct k_work *work)
                     LOG_INF("MAIN amplitude: %d", amplitude_abs);
                     register_tap_main(data);
                 } else {
-                    LOG_INF("MAIN tap detected, but sensor is disabled %d", amplitude_abs);
+                    // LOG_INF("MAIN tap detected, but sensor is disabled %d", amplitude_abs);
                 }
             }
         } 
@@ -496,7 +582,7 @@ static void adc_vbus_work_handler(struct k_work *work)
                     LOG_INF("WARN amplitude: %d", amplitude_abs);
                     register_tap_warn(data);
                 } else {
-                    LOG_INF("WARN tap detected, but sensor is disabled %d", amplitude_abs );
+                    // LOG_INF("WARN tap detected, but sensor is disabled %d", amplitude_abs );
                 }
                 
                 // LOG_ERR("Debug counter: %d", debug_counter);
@@ -660,7 +746,7 @@ static int sensor_init(const struct device *dev)
     #endif
 }
 
-void reset_timer_handler_alarm(struct k_timer *timer)
+static void reset_timer_handler_alarm(struct k_timer *timer)
 {
     // struct device *dev = k_timer_user_data_get(timer);
     // if (!dev) {
@@ -678,7 +764,7 @@ void reset_timer_handler_alarm(struct k_timer *timer)
     LOG_INF("Sensor is armed");
 }
 
-void increase_sensivity_warn_handler(struct k_timer *timer)
+static void increase_sensivity_warn_handler(struct k_timer *timer)
 {
     // struct device *dev = k_timer_user_data_get(timer);
     // if (!dev) {
@@ -693,7 +779,7 @@ void increase_sensivity_warn_handler(struct k_timer *timer)
     coarsering_warn(data, false);
 }
 
-void increase_sensivity_main_handler(struct k_timer *timer)
+static void increase_sensivity_main_handler(struct k_timer *timer)
 {
     // struct device *dev = k_timer_user_data_get(timer);
     
@@ -710,7 +796,7 @@ void increase_sensivity_main_handler(struct k_timer *timer)
     
 }
 
-void set_zones(const struct device *dev, int warn_zone, int main_zone)
+static void set_zones(const struct device *dev, int warn_zone, int main_zone)
 {
     struct sensor_data *data = dev->data;
     
@@ -722,7 +808,7 @@ void set_zones(const struct device *dev, int warn_zone, int main_zone)
     sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[warn_zone], .val2 = data->main_zones[main_zone] });
 }
 
-void set_warn_zones(const struct device *dev)
+static void set_warn_zones(const struct device *dev)
 {
     struct sensor_data *data = dev->data;
     for (int i = 0; i < 16; i++) {
@@ -730,7 +816,7 @@ void set_warn_zones(const struct device *dev)
     }
 }
 
-void create_main_zones(const struct device *dev, int zone)
+static void create_main_zones(const struct device *dev, int zone)
 {
     struct sensor_data *data = dev->data;
     for (int i = 0; i < 16; i++) {
@@ -738,38 +824,7 @@ void create_main_zones(const struct device *dev, int zone)
     }
 }
 
-void set_warn_zone(const struct device *dev, int zone)
-{
-    struct sensor_data *data = dev->data;
-    data->selected_warn_zone = zone;
-    data->current_warn_zone = zone;
-    create_main_zones(dev, zone);
-    sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[zone], .val2 = data->main_zones[data->current_main_zone] });
-}
-
-void change_warn_zone(const struct device *dev, int zone)
-{
-    struct sensor_data *data = dev->data;
-    data->current_warn_zone = zone;
-    sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[zone], .val2 = data->main_zones[data->current_main_zone] });
-}
-
-void set_main_zone(const struct device *dev, int zone)
-{
-    struct sensor_data *data = dev->data;
-    data->selected_main_zone = zone;
-    data->current_main_zone = zone;
-    sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[data->current_warn_zone], .val2 = data->main_zones[zone] });
-}
-
-void change_main_zone(const struct device *dev, int zone)
-{
-    struct sensor_data *data = dev->data;
-    data->current_main_zone = zone;
-    sensor_attr_set(dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[data->current_warn_zone], .val2 = data->main_zones[zone] });
-}
-
-void coarsering_warn(struct sensor_data *data, bool increase)
+static void coarsering_warn(struct sensor_data *data, bool increase)
 {
     if (increase) {
         if (data->current_warn_zone == 15) 
@@ -796,7 +851,7 @@ void coarsering_warn(struct sensor_data *data, bool increase)
         {
             data->current_warn_zone--; 
         } else {
-            LOG_INF("Warning: warn zone sensivity can`t be decreased due to noise level");
+            // LOG_INF("Warning: warn zone sensivity can`t be decreased due to noise level");
             k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             return;
         }
@@ -805,7 +860,7 @@ void coarsering_warn(struct sensor_data *data, bool increase)
     sensor_attr_set(data->dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[data->current_warn_zone], .val2 = data->main_zones[data->current_main_zone] });
 }
 
-void coarsering_main(struct sensor_data *data, bool increase)
+static void coarsering_main(struct sensor_data *data, bool increase)
 {
     if (increase) {
         if (data->current_main_zone == 15) 
@@ -840,7 +895,7 @@ void coarsering_main(struct sensor_data *data, bool increase)
     sensor_attr_set(data->dev, SENSOR_CHAN_PROX, SENSOR_ATTR_UPPER_THRESH, &(struct sensor_value){ .val1 = data->warn_zones[data->current_warn_zone], .val2 = data->main_zones[data->current_main_zone] });
 }
 
-void register_tap_main(struct sensor_data *data)
+static void register_tap_main(struct sensor_data *data)
 {
     int64_t current_time = k_uptime_get();
     if (current_time - data->last_tap_time_main < MIN_TAP_INTERVAL) {
@@ -853,7 +908,7 @@ void register_tap_main(struct sensor_data *data)
     
 }
 
-void register_tap_warn(struct sensor_data *data)
+static void register_tap_warn(struct sensor_data *data)
 {
     int64_t current_time = k_uptime_get();
     if (current_time - data->last_tap_time_warn < MIN_TAP_INTERVAL) {
