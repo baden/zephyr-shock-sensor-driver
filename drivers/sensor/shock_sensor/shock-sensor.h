@@ -53,7 +53,7 @@ struct sensor_data {
     int64_t max_noise_level_time;
     int64_t noise_sampling_interval_msec;
     int64_t noise_sampling_interval_sec;
-    int noise_level;
+    int max_noise_level;
 
     int increase_sensivity_interval;
 

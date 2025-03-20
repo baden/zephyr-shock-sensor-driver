@@ -139,30 +139,36 @@ static int attr_set(const struct device *dev,
         data->noise_sampling_interval_sec = val->val1;
         data->noise_sampling_interval_msec = data->noise_sampling_interval_sec * 1000;
         LOG_INF("Seted noise_sampling_interval_sec: %d", data->noise_sampling_interval_sec);
-        data->noise_level = 0;
+        data->max_noise_level = 0;
         data->max_noise_level_time = k_uptime_get();
         return 0;
     }
 
     if (chan == SHOCK_SENSOR_CHANNEL_WARN_ZONE && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
+        int64_t current_time = k_uptime_get();
         data->current_warn_zone = 15 - val->val1; 
         data->selected_warn_zone = data->current_warn_zone;
         create_main_zones(dev, val->val1);
         data->current_main_zone = 0;
         data->selected_main_zone = 0;
-        data->last_tap_time_warn = k_uptime_get();
-        data->last_tap_time_main = k_uptime_get();
+        data->last_tap_time_warn = current_time;
+        data->last_tap_time_main = current_time;
+        data->max_noise_level = 0;
+        data->max_noise_level_time = current_time;
         LOG_INF("Seted warn_zone: %d", data->current_warn_zone);
         set_zones(dev, data->current_warn_zone, data->current_main_zone);
         return 0;
     }
 
     if (chan == SHOCK_SENSOR_CHANNEL_MAIN_ZONE && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
+        int64_t current_time = k_uptime_get();
         data->current_main_zone = 15 - val->val1;
         data->selected_main_zone = data->current_main_zone;
         data->current_warn_zone = data->selected_warn_zone;
-        data->last_tap_time_warn = k_uptime_get();
-        data->last_tap_time_main = k_uptime_get();
+        data->last_tap_time_warn = current_time;
+        data->last_tap_time_main = current_time;
+        data->max_noise_level = 0;
+        data->max_noise_level_time = current_time;
         LOG_INF("Seted main_zone: %d", data->current_main_zone);
         set_zones(dev, data->current_warn_zone, data->current_main_zone);
         return 0;
@@ -191,11 +197,14 @@ static int attr_set(const struct device *dev,
             LOG_INF("Sensor is forced to disarmed mode");
         }
         if (data->mode == SHOCK_SENSOR_MODE_ARMED) {
-            data->last_tap_time_warn = k_uptime_get();
-            data->last_tap_time_main = k_uptime_get();
+            int64_t current_time = k_uptime_get();
+            data->last_tap_time_warn = current_time;
+            data->last_tap_time_main = current_time;
             k_timer_stop(&data->reset_timer_alarm);
             k_timer_stop(&data->increase_sensivity_timer_warn);
             k_timer_stop(&data->increase_sensivity_timer_main);
+            data->max_noise_level = 0;
+            data->max_noise_level_time = current_time;
             // k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             // k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             LOG_INF("Sensor is armed");
@@ -495,9 +504,16 @@ static void adc_vbus_work_handler(struct k_work *work)
             }
         }
     } else  {
-        if (amplitude_abs > data->noise_level || (k_uptime_get() - data->max_noise_level_time) > data->noise_sampling_interval_msec) {
-            data->noise_level = amplitude_abs;
-            data->max_noise_level_time = k_uptime_get();
+        int64_t current_time = k_uptime_get();
+
+        if ((current_time - data->max_noise_level_time) > data->noise_sampling_interval_msec) {
+            LOG_INF("Noise window reset. Previous max: %d", data->max_noise_level);
+            data->max_noise_level = amplitude_abs;
+            data->max_noise_level_time = current_time;
+        } else if (amplitude_abs > data->max_noise_level) {
+            data->max_noise_level = amplitude_abs;
+            data->max_noise_level_time = current_time;
+            LOG_INF("New max noise level: %d", data->max_noise_level);
         }
         
     }
