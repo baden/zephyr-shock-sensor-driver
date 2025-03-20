@@ -161,14 +161,14 @@ static int attr_set(const struct device *dev,
 
     if (chan == SHOCK_SENSOR_MODE && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
         data->mode = val->val1;
-        LOG_INF("Seted mode: %d", data->mode);
-        if (data->mode == SHOCK_SENSOR_MODE_ALARM) {
-            LOG_INF("Entering alarm mode for %d ms", val->val2);
+        if (data->mode == SHOCK_SENSOR_MODE_ALARM) {  
             k_timer_start(&data->reset_timer_alarm, K_MSEC(val->val2), K_NO_WAIT);
+            LOG_INF("Entering alarm mode for %d ms", val->val2);
         }
         if (data->mode == SHOCK_SENSOR_MODE_ALARM_STOP) {
             data->mode = SHOCK_SENSOR_MODE_ARMED;
             k_timer_stop(&data->reset_timer_alarm);
+            LOG_INF("Forced stop alarm mode");
         }
         if (data->mode == SHOCK_SENSOR_MODE_DISARMED || data->mode == SHOCK_SENSOR_MODE_TURN_OFF) {
             data->current_warn_zone = data->selected_warn_zone;
@@ -177,7 +177,7 @@ static int attr_set(const struct device *dev,
             k_timer_stop(&data->increase_sensivity_timer_warn);
             k_timer_stop(&data->increase_sensivity_timer_main);
             set_zones(dev, data->current_warn_zone, data->current_main_zone);
-            LOG_INF("Sensor is disarmed");
+            LOG_INF("Sensor is forced to disarmed mode");
         }
         if (data->mode == SHOCK_SENSOR_MODE_ARMED) {
             data->last_tap_time_warn = k_uptime_get();
