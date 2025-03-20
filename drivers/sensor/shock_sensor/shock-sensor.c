@@ -168,6 +168,8 @@ static int attr_set(const struct device *dev,
         if (data->mode == SHOCK_SENSOR_MODE_ALARM_STOP) {
             data->mode = SHOCK_SENSOR_MODE_ARMED;
             k_timer_stop(&data->reset_timer_alarm);
+            k_timer_stop(&data->increase_sensivity_timer_warn);
+            k_timer_stop(&data->increase_sensivity_timer_main);
             LOG_INF("Forced stop alarm mode");
         }
         if (data->mode == SHOCK_SENSOR_MODE_DISARMED || data->mode == SHOCK_SENSOR_MODE_TURN_OFF) {
@@ -183,8 +185,10 @@ static int attr_set(const struct device *dev,
             data->last_tap_time_warn = k_uptime_get();
             data->last_tap_time_main = k_uptime_get();
             k_timer_stop(&data->reset_timer_alarm);
-            k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
-            k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
+            k_timer_stop(&data->increase_sensivity_timer_warn);
+            k_timer_stop(&data->increase_sensivity_timer_main);
+            // k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
+            // k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             LOG_INF("Sensor is armed");
         }
         return 0;
