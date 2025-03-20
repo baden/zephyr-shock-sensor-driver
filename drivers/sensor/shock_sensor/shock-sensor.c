@@ -127,11 +127,20 @@ static int attr_set(const struct device *dev,
         return 0;
     }
 
-    if (chan == SHOCK_SENSOR_INCREASE_SENSIVITY_INTERVAL && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
+    if (chan == SHOCK_SENSOR_INCREASE_SENSIVITY_INTERVAL_SEC && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
         data->increase_sensivity_interval = val->val1;
         LOG_INF("Seted increase_sensivity_interval: %d", data->increase_sensivity_interval);
         k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
         k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
+        return 0;
+    }
+
+    if (chan == SHOCK_SENSOR_NOISE_SAMPLING_TIME_SEC && attr == SHOCK_SENSOR_SPECIAL_ATTRS) {
+        data->noise_sampling_interval_sec = val->val1;
+        data->noise_sampling_interval_msec = data->noise_sampling_interval_sec * 1000;
+        LOG_INF("Seted noise_sampling_interval_sec: %d", data->noise_sampling_interval_sec);
+        data->noise_level = 0;
+        data->max_noise_level_time = k_uptime_get();
         return 0;
     }
 
@@ -485,6 +494,12 @@ static void adc_vbus_work_handler(struct k_work *work)
                 // debug_counter = 0;
             }
         }
+    } else  {
+        if (amplitude_abs > data->noise_level || (k_uptime_get() - data->max_noise_level_time) > data->noise_sampling_interval_msec) {
+            data->noise_level = amplitude_abs;
+            data->max_noise_level_time = k_uptime_get();
+        }
+        
     }
 
 end:

@@ -50,6 +50,11 @@ struct sensor_data {
     int64_t last_tap_time_warn;
     int64_t last_tap_time_main;
 
+    int64_t max_noise_level_time;
+    int64_t noise_sampling_interval_msec;
+    int64_t noise_sampling_interval_sec;
+    int noise_level;
+
     int increase_sensivity_interval;
 
     struct k_timer reset_timer_alarm;
@@ -67,7 +72,8 @@ enum shock_sensor_channel {
     SHOCK_SENSOR_MODE=65,
     SHOCK_SENSOR_CHANNEL_WARN_ZONE,
     SHOCK_SENSOR_CHANNEL_MAIN_ZONE,
-    SHOCK_SENSOR_INCREASE_SENSIVITY_INTERVAL,
+    SHOCK_SENSOR_INCREASE_SENSIVITY_INTERVAL_SEC,
+    SHOCK_SENSOR_NOISE_SAMPLING_TIME_SEC,
 };
 
 enum shock_sensor_attrs {
