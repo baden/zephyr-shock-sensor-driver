@@ -778,6 +778,12 @@ void coarsering_warn(struct sensor_data *data, bool increase)
             k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             return;
         }
+        if (data->warn_zones[data->current_warn_zone+1] >= treshold_main)
+        {
+            LOG_INF("Warning: warn zone sensivity can`t be increased due to main zone");
+            k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
+            return;
+        }
         data->current_warn_zone++;
     } else {
         if (data->current_warn_zone == data->selected_warn_zone)
@@ -818,6 +824,11 @@ void coarsering_main(struct sensor_data *data, bool increase)
         }
         if (data->max_noise_level <= data->main_zones[data->current_main_zone - 1])
         {
+            if (data->main_zones[data->current_main_zone-1] <= treshold_warn){
+                LOG_INF("Warning: main zone sensivity can`t be decreased due to warn zone");
+                k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
+                return;
+            }
             data->current_main_zone--; 
         } else {
             LOG_INF("Warning: main zone sensivity can`t be decreased due to noise level");
