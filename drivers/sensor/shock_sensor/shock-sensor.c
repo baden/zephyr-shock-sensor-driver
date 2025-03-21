@@ -391,9 +391,6 @@ static int pm_action(const struct device *dev, enum pm_device_action action)
 
 // TODO: Перенести це все в data
 
-// Ненулове значення блокує спрацювання датчика удару.
-int share_ignore_time = 0;
-
 // Ненульове значення означає шо датчик в спрацюванні
 int shake_warn = 0;
 int shake_main = 0;
@@ -527,13 +524,6 @@ static void adc_vbus_work_handler(struct k_work *work)
         goto end;
     }
 
-    if(share_ignore_time) {
-        //if(!is_panic()) {
-            share_ignore_time--;
-        //}
-        goto end;
-    }
-
     #if CONFIG_SEQUENCE_SAMPLES == 1
         int amplitude_x = new_val - adc_centered_value;
         int amplitude_abs = abs(amplitude_x) / MULTIPLIER;
@@ -586,13 +576,6 @@ end:
     #else
         k_work_schedule_for_queue(&data->workq, &data->dwork, K_MSEC(config->sensor.sampling_period_ms));
     #endif
-}
-
-// TODO: Це треба винести в API
-
-void shake_ignore_me(int secs)
-{
-    share_ignore_time = Secs(secs);
 }
 
 // static K_THREAD_STACK_DEFINE(workq_stack, CONFIG_SENSOR_SHOCK_THREAD_STACK_SIZE);
