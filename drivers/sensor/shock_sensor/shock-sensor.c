@@ -12,7 +12,7 @@
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/pm/device.h>
 #include "shock-sensor.h"
-
+#include <math.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
@@ -797,10 +797,10 @@ static void create_main_zones(const struct device *dev, int zone)
     float k = koeff[data->selected_warn_zone];
     float float_main_zones[16];
     float_main_zones[0] = (float)data->treshold_warn * k;
-    data->main_zones[0] = (int)float_main_zones[0];
+    data->main_zones[0] = (int)roundf(float_main_zones[0]);
     for (int i = 1; i < 16; i++) {
         float_main_zones[i] = float_main_zones[i-1] * k;
-        data->main_zones[i] = (int)float_main_zones[i];
+        data->main_zones[i] = (int)roundf(float_main_zones[i]);
     }
 }
 
