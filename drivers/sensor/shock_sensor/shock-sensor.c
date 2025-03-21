@@ -230,7 +230,7 @@ static int attr_set(const struct device *dev,
 
     if (chan == (enum sensor_channel)SHOCK_SENSOR_CHANNEL_WARN_ZONE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
         int64_t current_time = k_uptime_get();
-        data->current_warn_zone = 15 - val->val1; 
+        data->current_warn_zone = 16 - val->val1; 
         if (data->current_warn_zone < 0) {
             data->current_warn_zone = 0;
         }
@@ -252,7 +252,7 @@ static int attr_set(const struct device *dev,
 
     if (chan == (enum sensor_channel)SHOCK_SENSOR_CHANNEL_MAIN_ZONE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
         int64_t current_time = k_uptime_get();
-        data->current_main_zone = 15 - val->val1;
+        data->current_main_zone = 16 - val->val1;
         if (data->current_main_zone < 0) {
             data->current_main_zone = 0;
         }
@@ -271,11 +271,16 @@ static int attr_set(const struct device *dev,
     }
 
     if (chan == (enum sensor_channel)SHOCK_SENSOR_MODE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
-        data->mode = val->val1;
-        if (data->mode == SHOCK_SENSOR_MODE_ALARM) {  
+        
+
+        if (val->val1 == SHOCK_SENSOR_MODE_ALARM && data->mode == SHOCK_SENSOR_MODE_ARMED) { 
+            data->mode = SHOCK_SENSOR_MODE_ALARM;
             k_timer_start(&data->reset_timer_alarm, K_MSEC(val->val2), K_NO_WAIT);
             LOG_INF("Entering alarm mode for %d ms", val->val2);
         }
+
+        data->mode = val->val1;
+
         if (data->mode == SHOCK_SENSOR_MODE_ALARM_STOP) {
             data->mode = SHOCK_SENSOR_MODE_ARMED;
             k_timer_stop(&data->reset_timer_alarm);
@@ -552,6 +557,8 @@ static void adc_vbus_work_handler(struct k_work *work)
             data->main_handler(dev, data->main_trigger);
             LOG_INF("MAIN amplitude: %d", amplitude_abs);
             register_tap_main(data);
+        } else {
+            LOG_ERR("Problem with main_handler");
         }
     } else if (amplitude_abs > data->treshold_warn && data->shake_warn == 0) {
         data->shake_warn = CONFIG_SHAKE_WARN_TIME;
@@ -559,6 +566,8 @@ static void adc_vbus_work_handler(struct k_work *work)
             data->warn_handler(dev, data->warn_trigger);
             LOG_INF("WARN amplitude: %d", amplitude_abs);
             register_tap_warn(data);
+        } else {
+            LOG_ERR("Problem with warn_handler");
         }
     } else if (data->shake_warn == 0 && data->shake_main == 0) {
         int64_t current_time = k_uptime_get();
@@ -571,7 +580,7 @@ static void adc_vbus_work_handler(struct k_work *work)
                     data->max_noise_level_time = current_time;
                     LOG_INF("New max noise level: %d", data->max_noise_level);
                 }
-        }
+    }
     
 
 end:
