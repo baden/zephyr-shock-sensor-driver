@@ -557,6 +557,8 @@ static void adc_vbus_work_handler(struct k_work *work)
             data->main_handler(dev, data->main_trigger);
             LOG_INF("MAIN amplitude: %d", amplitude_abs);
             register_tap_main(data);
+        } else {
+            LOG_ERR("Problem with main_handler");
         }
     } else if (amplitude_abs > data->treshold_warn && data->shake_warn == 0) {
         data->shake_warn = CONFIG_SHAKE_WARN_TIME;
@@ -564,6 +566,8 @@ static void adc_vbus_work_handler(struct k_work *work)
             data->warn_handler(dev, data->warn_trigger);
             LOG_INF("WARN amplitude: %d", amplitude_abs);
             register_tap_warn(data);
+        } else {
+            LOG_ERR("Problem with warn_handler");
         }
     } else if (data->shake_warn == 0 && data->shake_main == 0) {
         int64_t current_time = k_uptime_get();
