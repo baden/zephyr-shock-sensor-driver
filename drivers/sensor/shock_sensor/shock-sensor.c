@@ -566,7 +566,7 @@ static void adc_vbus_work_handler(struct k_work *work)
             LOG_INF("WARN amplitude: %d", amplitude_abs);
             register_tap_warn(data);
         }
-    } else {
+    } else if (shake_warn == 0 && shake_main == 0) {
         int64_t current_time = k_uptime_get();
         if ((current_time - data->max_noise_level_time) > data->noise_sampling_interval_msec) {
             LOG_INF("Noise window reset. Previous max: %d", data->max_noise_level);
