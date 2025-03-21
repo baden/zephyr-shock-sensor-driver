@@ -271,11 +271,16 @@ static int attr_set(const struct device *dev,
     }
 
     if (chan == (enum sensor_channel)SHOCK_SENSOR_MODE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
-        data->mode = val->val1;
-        if (data->mode == SHOCK_SENSOR_MODE_ALARM) {  
+        
+
+        if (val->val1 == SHOCK_SENSOR_MODE_ALARM && data->mode == SHOCK_SENSOR_MODE_ARMED) { 
+            data->mode = SHOCK_SENSOR_MODE_ALARM;
             k_timer_start(&data->reset_timer_alarm, K_MSEC(val->val2), K_NO_WAIT);
             LOG_INF("Entering alarm mode for %d ms", val->val2);
         }
+
+        data->mode = val->val1;
+
         if (data->mode == SHOCK_SENSOR_MODE_ALARM_STOP) {
             data->mode = SHOCK_SENSOR_MODE_ARMED;
             k_timer_stop(&data->reset_timer_alarm);
@@ -571,7 +576,7 @@ static void adc_vbus_work_handler(struct k_work *work)
                     data->max_noise_level_time = current_time;
                     LOG_INF("New max noise level: %d", data->max_noise_level);
                 }
-        }
+    }
     
 
 end:
