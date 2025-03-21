@@ -230,7 +230,7 @@ static int attr_set(const struct device *dev,
 
     if (chan == (enum sensor_channel)SHOCK_SENSOR_CHANNEL_WARN_ZONE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
         int64_t current_time = k_uptime_get();
-        data->current_warn_zone = 15 - val->val1; 
+        data->current_warn_zone = 16 - val->val1; 
         if (data->current_warn_zone < 0) {
             data->current_warn_zone = 0;
         }
@@ -252,7 +252,7 @@ static int attr_set(const struct device *dev,
 
     if (chan == (enum sensor_channel)SHOCK_SENSOR_CHANNEL_MAIN_ZONE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
         int64_t current_time = k_uptime_get();
-        data->current_main_zone = 15 - val->val1;
+        data->current_main_zone = 16 - val->val1;
         if (data->current_main_zone < 0) {
             data->current_main_zone = 0;
         }
