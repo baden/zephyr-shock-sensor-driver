@@ -2,72 +2,6 @@
 
 #include <zephyr/drivers/adc.h>
 
-#ifdef CONFIG_SEQUENCE_32BITS_REGISTERS
-    #define ADC_READING_TYPE uint32_t
-#else
-    #define ADC_READING_TYPE uint16_t
-#endif
-
-#define SHOCK_SENSOR_ACTIVE 1
-#define SHOCK_SENSOR_INACTIVE 0
-#define CONFIG_SEQUENCE_SAMPLES 16
-#define MIN_TAP_INTERVAL 1000 // ms
-
-
-struct sensor_data {
-    struct adc_sequence sequence;
-    k_timeout_t earliest_sample;
-    ADC_READING_TYPE raw[CONFIG_SEQUENCE_SAMPLES];
-
-    const struct device *dev;   // self reference
-    struct k_work_q workq;   /* work queue */
-    struct k_work_delayable dwork;  /* workers */
-
-    // #ifndef CONFIG_USE_SYS_WORK_Q
-    //     K_KERNEL_STACK_MEMBER(workq_stack, CONFIG_SENSOR_SHOCK_THREAD_STACK_SIZE);
-    // #endif
-    // struct k_poll_signal async_sig;
-    sensor_trigger_handler_t warn_handler;
-    const struct sensor_trigger *warn_trigger;
-    sensor_trigger_handler_t main_handler;
-    const struct sensor_trigger *main_trigger;
-
-    int warn_zones[16];
-    int main_zones[16];
-    int selected_warn_zone;
-    int selected_main_zone;
-    int current_warn_zone;
-    int current_main_zone;
-
-    int treshold_warn;
-    int treshold_main;
-
-    int warn_count;
-    int main_count;
-
-    int min_tap_interval;
-
-    int64_t last_tap_time_warn;
-    int64_t last_tap_time_main;
-
-    int64_t max_noise_level_time;
-    int64_t noise_sampling_interval_msec;
-    int64_t noise_sampling_interval_sec;
-    int max_noise_level;
-
-    int increase_sensivity_interval;
-
-    struct k_timer reset_timer_alarm;
-
-    struct k_timer increase_sensivity_timer_warn;
-    struct k_timer increase_sensivity_timer_main;
-
-    bool active;
-    int mode;
-};
-
-static const int warn_zones_initial[16] = {4, 5, 6, 8, 10, 12, 14, 17, 20, 23, 27, 32, 37, 43, 50, 60};
-
 enum shock_sensor_channel {
     SHOCK_SENSOR_MODE=65,
     SHOCK_SENSOR_CHANNEL_WARN_ZONE,
@@ -87,12 +21,6 @@ enum shock_sensor_mode {
     SHOCK_SENSOR_MODE_ALARM,
     SHOCK_SENSOR_MODE_ALARM_STOP,
 };
-
-struct shock_sensor_dt_spec {
-	const struct adc_dt_spec port;
-    uint32_t sampling_period_ms;
-};
-
 /**
  * @brief Get shock sensor information from devicetree.
  *
@@ -120,23 +48,3 @@ __subsystem struct shock_sensor_driver_api {
     sensor_get_decoder_t get_decoder;
     sensor_submit_t submit;
 };
-
-void reset_timer_handler_main(struct k_timer *);
-void reset_timer_handler_warn(struct k_timer *);
-void reset_timer_handler_alarm(struct k_timer *);
-
-void increase_sensivity_warn_handler(struct k_timer *);
-void increase_sensivity_main_handler(struct k_timer *);
-
-void set_zones(const struct device *dev, int warn_zone, int main_zone);
-void set_warn_zones(const struct device *dev);
-void set_warn_zone(const struct device *dev, int zone);
-void create_main_zones(const struct device *dev, int zone);
-void coarsering_warn(struct sensor_data *data, bool increase);
-void coarsering_main(struct sensor_data *data, bool increase);
-void register_tap_main(struct sensor_data *data);
-void register_tap_warn(struct sensor_data *data);
-void change_warn_zone(const struct device *dev, int zone);
-void set_main_zone(const struct device *dev, int zone);
-void change_main_zone(const struct device *dev, int zone);
-
