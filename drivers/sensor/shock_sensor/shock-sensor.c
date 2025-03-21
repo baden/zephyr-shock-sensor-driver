@@ -25,7 +25,7 @@ LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
 
 #define CONFIG_SEQUENCE_SAMPLES 16
 #define MIN_TAP_INTERVAL 1000 // ms
-
+#define ADC_READ_MAX_ATTEMPTS 3
 
 struct sensor_data {
     struct adc_sequence sequence;
@@ -426,14 +426,19 @@ static void adc_vbus_work_handler(struct k_work *work)
     #endif
 
     // uint64_t timestart = k_ticks_to_us_floor64(k_uptime_ticks()); //k_uptime_get();
-
+    int ret = 1;
     #if defined(CONFIG_USE_ASYNC_ADC_READ)
         struct k_poll_signal async_sig = K_POLL_SIGNAL_INITIALIZER(async_sig);
         struct k_poll_event async_evt = K_POLL_EVENT_INITIALIZER(K_POLL_TYPE_SIGNAL,
         K_POLL_MODE_NOTIFY_ONLY, &async_sig);
-        int ret = adc_read_async(config->sensor.port.dev, &data->sequence, &async_sig);
+        ret = adc_read_async(config->sensor.port.dev, &data->sequence, &async_sig);
     #else
-        int ret = adc_read(config->sensor.port.dev, &data->sequence);
+    int attempts = 0;
+    do {
+        ret = adc_read(config->sensor.port.dev, &data->sequence);
+        if (++attempts == ADC_READ_MAX_ATTEMPTS) break;
+    } while(!ret);
+
     #endif
     if(ret != 0) {
         LOG_ERR("adc_read[_async]: %d", ret);
