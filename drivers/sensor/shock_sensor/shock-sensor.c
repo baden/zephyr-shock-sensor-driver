@@ -57,6 +57,10 @@ struct sensor_data {
     int treshold_warn;
     int treshold_main;
 
+    int shake_warn;
+    int shake_main;
+    int adc_centered_value;
+
     int min_tap_interval;
 
     int64_t last_tap_time_warn;
@@ -385,17 +389,6 @@ static int pm_action(const struct device *dev, enum pm_device_action action)
 // }
 
 
-
-// TODO: Перенести це все в data
-
-// Ненульове значення означає шо датчик в спрацюванні
-int shake_warn = 0;
-int shake_main = 0;
-
-// TODO: Перенести це в data
-static int adc_centered_value = 0;
-
-
 #define __TEMP_SENSOR_SHAKE_WARN_ZONE 14
 #define __TEMP_SENSOR_SHAKE_MAIN_ZONE 100
 
@@ -504,16 +497,16 @@ static void adc_vbus_work_handler(struct k_work *work)
 
     // Set centered value. Middle of the last 16 samples
     // Save 16x value, but use normalised value later
-    adc_centered_value = (adc_centered_value * (CONFIG_SHAKE_CENTERED_COUNT-1) + new_val) / CONFIG_SHAKE_CENTERED_COUNT;
+    data->adc_centered_value = (data->adc_centered_value * (CONFIG_SHAKE_CENTERED_COUNT-1) + new_val) / CONFIG_SHAKE_CENTERED_COUNT;
 
     // LOG_ERR("Shake sensor sample_raw: %d", val.val1);
 
-    if(shake_main) {
-        shake_main--;
+    if(data->shake_main) {
+        data->shake_main--;
     }
 
-    if(shake_warn) {
-        shake_warn--;
+    if(data->shake_warn) {
+        data->shake_warn--;
     }
 
     if (data->mode)
@@ -522,11 +515,11 @@ static void adc_vbus_work_handler(struct k_work *work)
     }
 
     #if CONFIG_SEQUENCE_SAMPLES == 1
-        int amplitude_x = new_val - adc_centered_value;
+        int amplitude_x = new_val - data->adc_centered_value;
         int amplitude_abs = abs(amplitude_x) / MULTIPLIER;
     #else
-        int amplitude_x1 = max - adc_centered_value;
-        int amplitude_x2 = adc_centered_value - min;
+        int amplitude_x1 = max - data->adc_centered_value;
+        int amplitude_x2 = data->adc_centered_value - min;
         int amplitude_x = (amplitude_x1 > amplitude_x2) ? amplitude_x1 : amplitude_x2;
         int amplitude_abs = amplitude_x / MULTIPLIER;
     #endif
@@ -539,21 +532,21 @@ static void adc_vbus_work_handler(struct k_work *work)
     //     debug_counter = 0;
     // }
 
-    if (amplitude_abs > data->treshold_main && shake_main == 0) {
-        shake_main = CONFIG_SHAKE_MAIN_TIME;
+    if (amplitude_abs > data->treshold_main && data->shake_main == 0) {
+        data->shake_main = CONFIG_SHAKE_MAIN_TIME;
         if (data->main_handler) {
             data->main_handler(dev, data->main_trigger);
             LOG_INF("MAIN amplitude: %d", amplitude_abs);
             register_tap_main(data);
         }
-    } else if (amplitude_abs > data->treshold_warn && shake_warn == 0) {
-        shake_warn = CONFIG_SHAKE_WARN_TIME;
+    } else if (amplitude_abs > data->treshold_warn && data->shake_warn == 0) {
+        data->shake_warn = CONFIG_SHAKE_WARN_TIME;
         if (data->warn_handler) {
             data->warn_handler(dev, data->warn_trigger);
             LOG_INF("WARN amplitude: %d", amplitude_abs);
             register_tap_warn(data);
         }
-    } else if (shake_warn == 0 && shake_main == 0) {
+    } else if (data->shake_warn == 0 && data->shake_main == 0) {
         int64_t current_time = k_uptime_get();
         if ((current_time - data->max_noise_level_time) > data->noise_sampling_interval_msec) {
             LOG_INF("Noise window reset. Previous max: %d", data->max_noise_level);
@@ -601,18 +594,20 @@ static int sensor_init(const struct device *dev)
 
     // self reference
     data->dev = dev;
-
+    data->shake_main = 0;
+    data->shake_warn = 0;
+    data->adc_centered_value = 0;
     data->warn_handler = NULL;
     data->main_handler = NULL;
     data->treshold_warn = __TEMP_SENSOR_SHAKE_WARN_ZONE;
     data->treshold_main = __TEMP_SENSOR_SHAKE_MAIN_ZONE;
 
     // Перші 10 секунд треба пропустити спрацювання за для стабілізації датчика
-    shake_main = 10 * 1000 / config->sensor.sampling_period_ms / CONFIG_SEQUENCE_SAMPLES;
-    shake_warn = shake_main;
+    data->shake_main = 10 * 1000 / config->sensor.sampling_period_ms / CONFIG_SEQUENCE_SAMPLES;
+    data->shake_warn = data->shake_main;
 
     // Середина живлення (десь 522513). Якось треба врахувати розрядність ADC. Поки це 12 біт.
-    adc_centered_value = MULTIPLIER * 2048;
+    data->adc_centered_value = MULTIPLIER * 2048;
 
     /* Default value to use if `power-gpios` does not exist */
     data->earliest_sample = K_TIMEOUT_ABS_TICKS(0);
