@@ -23,8 +23,6 @@ LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
     #define ADC_READING_TYPE uint16_t
 #endif
 
-#define SHOCK_SENSOR_ACTIVE 1
-#define SHOCK_SENSOR_INACTIVE 0
 #define CONFIG_SEQUENCE_SAMPLES 16
 #define MIN_TAP_INTERVAL 1000 // ms
 
@@ -78,7 +76,6 @@ struct sensor_data {
     struct k_timer increase_sensivity_timer_warn;
     struct k_timer increase_sensivity_timer_main;
 
-    bool active;
     int mode;
 };
 
