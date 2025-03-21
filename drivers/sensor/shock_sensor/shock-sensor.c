@@ -576,7 +576,7 @@ static void adc_vbus_work_handler(struct k_work *work)
                 data->main_handler(dev, data->main_trigger);
                 LOG_INF("MAIN amplitude: %d", amplitude_abs);
             } else {
-                LOG_INF("MAIN trigger disabled amplitude: %d", amplitude_abs)
+                LOG_INF("MAIN trigger disabled amplitude: %d", amplitude_abs);
             }
             register_tap_main(data);
         } else {
