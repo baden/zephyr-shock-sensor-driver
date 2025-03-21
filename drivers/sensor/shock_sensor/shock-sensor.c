@@ -84,7 +84,7 @@ struct sensor_data {
 };
 
 // static const int warn_zones_initial[16] = {4, 5, 6, 8, 10, 12, 14, 17, 20, 23, 27, 32, 37, 43, 50, 60};
-static const int warn_zones_initial[16] = {4, 5, 7, 9, 12, 16, 21, 27, 36, 47, 61, 81, 106, 139, 183, 240};
+static const int warn_zones_initial[16] = {2, 5, 7, 9, 12, 16, 21, 27, 36, 47, 61, 81, 106, 139, 183, 240};
 static const float koeff[16] = {
     1.448361441, 1.428302112, 1.398579236, 1.376783165, 
     1.352249644, 1.328153297, 1.305770936, 1.285421230, 
@@ -862,7 +862,7 @@ static void coarsering_main(struct sensor_data *data, bool increase)
         if (data->current_main_zone == data->selected_main_zone) 
         {
             LOG_INF("Warning: Maximum or setted main zone sensivity reached");
-            k_timer_stop(&data->increase_sensivity_timer_main);
+            k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             return;
         }
         if (data->max_noise_level <= data->main_zones[data->current_main_zone - 1])
