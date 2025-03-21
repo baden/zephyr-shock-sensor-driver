@@ -547,66 +547,36 @@ static void adc_vbus_work_handler(struct k_work *work)
     //     debug_counter = 0;
     // }
 
-    if (shake_main == 0 || shake_warn == 0) {
-        if(amplitude_abs > data->treshold_main /*TPF(sensor_shake_zone2)*/) {
-            if(shake_main == 0) {
-                // LOG_ERR("Shock MAIN: %d", amplitude_x/MULTIPLIER);
-                
-                shake_main = CONFIG_SHAKE_MAIN_TIME;
-                if(data->main_handler != NULL) {
-                    // struct sensor_trigger trig = {
-                    //     .chan = SENSOR_CHAN_PROX,
-                    //     .type = SENSOR_TRIG_THRESHOLD,
-                    // };
-                    if (data->mode == 0) {
-                        data->main_handler(dev, data->main_trigger);
-                        LOG_INF("MAIN amplitude: %d", amplitude_abs);
-                        register_tap_main(data);
-                    } else {
-                        // LOG_INF("MAIN tap detected, but sensor is disabled %d", amplitude_abs);
-                    }
-                }
-            } 
-        } else if(amplitude_abs > data->treshold_warn) {
-            if(shake_warn == 0) {
-                // LOG_ERR("Shock WARN: %d (%d/%d)", amplitude_x/MULTIPLIER, new_val, adc_centered_value);
-                shake_warn = CONFIG_SHAKE_WARN_TIME;
-
-                if(data->warn_handler != NULL) {
-                    // struct sensor_trigger trig = {
-                    //     .chan = SENSOR_CHAN_PROX,
-                    //     .type = SENSOR_TRIG_TAP,
-                    // };
-                    if (data->mode == 0) {
-                        data->warn_handler(dev, data->warn_trigger);
-                        LOG_INF("WARN amplitude: %d", amplitude_abs);
-                        register_tap_warn(data);
-                    } else {
-                        // LOG_INF("WARN tap detected, but sensor is disabled %d", amplitude_abs );
-                    }
-                    
-                    // LOG_ERR("Debug counter: %d", debug_counter);
-                    // debug_counter = 0;
-                }
+    if (data->mode == SHOCK_SENSOR_MODE_ARMED)
+    {
+        if (amplitude_abs > data->treshold_main && shake_main == 0) {
+            shake_main = CONFIG_SHAKE_MAIN_TIME;
+            if (data->main_handler) {
+                data->main_handler(dev, data->main_trigger);
+                LOG_INF("MAIN amplitude: %d", amplitude_abs);
+                register_tap_main(data);
             }
-        } else  {
-            if (shake_main == 0) shake_main = CONFIG_SHAKE_MAIN_TIME;
-            if (shake_warn == 0) shake_warn = CONFIG_SHAKE_WARN_TIME;
-            if (data->mode == SHOCK_SENSOR_MODE_ARMED) {
-                int64_t current_time = k_uptime_get();
-
-                if ((current_time - data->max_noise_level_time) > data->noise_sampling_interval_msec) {
-                    LOG_INF("Noise window reset. Previous max: %d", data->max_noise_level);
-                    data->max_noise_level = amplitude_abs;
-                    data->max_noise_level_time = current_time;
-                } else if (amplitude_abs > data->max_noise_level) {
-                    data->max_noise_level = amplitude_abs;
-                    data->max_noise_level_time = current_time;
-                    LOG_INF("New max noise level: %d", data->max_noise_level);
-                }
-            } 
+        } else if (amplitude_abs > data->treshold_warn && shake_warn == 0) {
+            shake_warn = CONFIG_SHAKE_WARN_TIME;
+            if (data->warn_handler) {
+                data->warn_handler(dev, data->warn_trigger);
+                LOG_INF("WARN amplitude: %d", amplitude_abs);
+                register_tap_warn(data);
+            }
+        } else {
+            int64_t current_time = k_uptime_get();
+            if ((current_time - data->max_noise_level_time) > data->noise_sampling_interval_msec) {
+                LOG_INF("Noise window reset. Previous max: %d", data->max_noise_level);
+                data->max_noise_level = amplitude_abs;
+                data->max_noise_level_time = current_time;
+            } else if (amplitude_abs > data->max_noise_level) {
+                        data->max_noise_level = amplitude_abs;
+                        data->max_noise_level_time = current_time;
+                        LOG_INF("New max noise level: %d", data->max_noise_level);
+                    }
         }
     }
+    
 
 end:
     #ifdef CONFIG_USE_SYS_WORK_Q
