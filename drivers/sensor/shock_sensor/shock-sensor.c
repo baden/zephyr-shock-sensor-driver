@@ -83,7 +83,14 @@ struct sensor_data {
     int mode;
 };
 
-static const int warn_zones_initial[16] = {4, 5, 6, 8, 10, 12, 14, 17, 20, 23, 27, 32, 37, 43, 50, 60};
+// static const int warn_zones_initial[16] = {4, 5, 6, 8, 10, 12, 14, 17, 20, 23, 27, 32, 37, 43, 50, 60};
+static const int warn_zones_initial[16] = {4, 5, 7, 9, 12, 16, 21, 27, 36, 47, 61, 81, 106, 139, 183, 240};
+static const float koeff[16] = {
+    1.448361441, 1.428302112, 1.398579236, 1.376783165, 
+    1.352249644, 1.328153297, 1.305770936, 1.285421230, 
+    1.262515729, 1.241651128, 1.221581899, 1.200121980, 
+    1.180114338, 1.160291949, 1.140518963, 1.121353392
+};
 
 
 
@@ -787,8 +794,13 @@ static void set_warn_zones(const struct device *dev)
 static void create_main_zones(const struct device *dev, int zone)
 {
     struct sensor_data *data = dev->data;
-    for (int i = 0; i < 16; i++) {
-        data->main_zones[i] = data->warn_zones[zone] * 2 + (i * 5); 
+    float k = koeff[data->selected_warn_zone];
+    float float_main_zones[16];
+    float_main_zones[0] = (float)data->treshold_warn * k;
+    data->main_zones[0] = (int)float_main_zones[0];
+    for (int i = 1; i < 16; i++) {
+        float_main_zones[i] = float_main_zones[i-1] * k;
+        data->main_zones[i] = (int)float_main_zones[i];
     }
 }
 
