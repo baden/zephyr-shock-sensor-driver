@@ -862,7 +862,7 @@ static void coarsering_main(struct sensor_data *data, bool increase)
         if (data->current_main_zone == data->selected_main_zone) 
         {
             LOG_INF("Warning: Maximum or setted main zone sensivity reached");
-            k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
+            // k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             return;
         }
         if (data->max_noise_level <= data->main_zones[data->current_main_zone - 1])
