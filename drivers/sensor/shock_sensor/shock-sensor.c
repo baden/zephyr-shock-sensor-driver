@@ -522,6 +522,11 @@ static void adc_vbus_work_handler(struct k_work *work)
         shake_warn--;
     }
 
+    if (data->mode)
+    {
+        goto end;
+    }
+
     if(share_ignore_time) {
         //if(!is_panic()) {
             share_ignore_time--;
@@ -547,35 +552,32 @@ static void adc_vbus_work_handler(struct k_work *work)
     //     debug_counter = 0;
     // }
 
-    if (data->mode == SHOCK_SENSOR_MODE_ARMED)
-    {
-        if (amplitude_abs > data->treshold_main && shake_main == 0) {
-            shake_main = CONFIG_SHAKE_MAIN_TIME;
-            if (data->main_handler) {
-                data->main_handler(dev, data->main_trigger);
-                LOG_INF("MAIN amplitude: %d", amplitude_abs);
-                register_tap_main(data);
-            }
-        } else if (amplitude_abs > data->treshold_warn && shake_warn == 0) {
-            shake_warn = CONFIG_SHAKE_WARN_TIME;
-            if (data->warn_handler) {
-                data->warn_handler(dev, data->warn_trigger);
-                LOG_INF("WARN amplitude: %d", amplitude_abs);
-                register_tap_warn(data);
-            }
-        } else {
-            int64_t current_time = k_uptime_get();
-            if ((current_time - data->max_noise_level_time) > data->noise_sampling_interval_msec) {
-                LOG_INF("Noise window reset. Previous max: %d", data->max_noise_level);
-                data->max_noise_level = amplitude_abs;
-                data->max_noise_level_time = current_time;
-            } else if (amplitude_abs > data->max_noise_level) {
-                        data->max_noise_level = amplitude_abs;
-                        data->max_noise_level_time = current_time;
-                        LOG_INF("New max noise level: %d", data->max_noise_level);
-                    }
+    if (amplitude_abs > data->treshold_main && shake_main == 0) {
+        shake_main = CONFIG_SHAKE_MAIN_TIME;
+        if (data->main_handler) {
+            data->main_handler(dev, data->main_trigger);
+            LOG_INF("MAIN amplitude: %d", amplitude_abs);
+            register_tap_main(data);
         }
-    }
+    } else if (amplitude_abs > data->treshold_warn && shake_warn == 0) {
+        shake_warn = CONFIG_SHAKE_WARN_TIME;
+        if (data->warn_handler) {
+            data->warn_handler(dev, data->warn_trigger);
+            LOG_INF("WARN amplitude: %d", amplitude_abs);
+            register_tap_warn(data);
+        }
+    } else {
+        int64_t current_time = k_uptime_get();
+        if ((current_time - data->max_noise_level_time) > data->noise_sampling_interval_msec) {
+            LOG_INF("Noise window reset. Previous max: %d", data->max_noise_level);
+            data->max_noise_level = amplitude_abs;
+            data->max_noise_level_time = current_time;
+        } else if (amplitude_abs > data->max_noise_level) {
+                    data->max_noise_level = amplitude_abs;
+                    data->max_noise_level_time = current_time;
+                    LOG_INF("New max noise level: %d", data->max_noise_level);
+                }
+        }
     
 
 end:
