@@ -571,8 +571,13 @@ static void adc_vbus_work_handler(struct k_work *work)
     if (amplitude_abs > data->treshold_main && data->shake_main == 0 && !data->max_level_alert_main) {
         data->shake_main = CONFIG_SHAKE_MAIN_TIME;
         if (data->main_handler) {
-            data->main_handler(dev, data->main_trigger);
-            LOG_INF("MAIN amplitude: %d", amplitude_abs);
+            if (!data->max_level_alert_main)
+            {
+                data->main_handler(dev, data->main_trigger);
+                LOG_INF("MAIN amplitude: %d", amplitude_abs);
+            } else {
+                LOG_INF("MAIN trigger disabled amplitude: %d", amplitude_abs)
+            }
             register_tap_main(data);
         } else {
             LOG_ERR("Problem with main_handler");
