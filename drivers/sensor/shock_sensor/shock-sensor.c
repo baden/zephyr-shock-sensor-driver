@@ -57,9 +57,6 @@ struct sensor_data {
     int treshold_warn;
     int treshold_main;
 
-    int warn_count;
-    int main_count;
-
     int min_tap_interval;
 
     int64_t last_tap_time_warn;
@@ -839,7 +836,6 @@ static void register_tap_main(struct sensor_data *data)
         return;
     }
     data->last_tap_time_main = current_time;
-    // data->main_count++;
     coarsering_main(data, true);
     
 }
@@ -852,7 +848,6 @@ static void register_tap_warn(struct sensor_data *data)
         return;
     } 
     data->last_tap_time_warn = current_time;
-    // data->warn_count++;
     coarsering_warn(data, true);
 } 
 
