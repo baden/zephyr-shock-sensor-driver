@@ -437,7 +437,7 @@ static void adc_vbus_work_handler(struct k_work *work)
     do {
         ret = adc_read(config->sensor.port.dev, &data->sequence);
         if (++attempts == ADC_READ_MAX_ATTEMPTS) break;
-    } while(!ret);
+    } while(ret != 0);
 
     #endif
     if(ret != 0) {
