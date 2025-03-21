@@ -753,14 +753,6 @@ static int sensor_init(const struct device *dev)
 
 static void reset_timer_handler_alarm(struct k_timer *timer)
 {
-    // struct device *dev = k_timer_user_data_get(timer);
-    // if (!dev) {
-    //     LOG_ERR("Device is NULL in timer handler!");
-    //     return;
-    // }
-
-    // struct sensor_data *data = dev->data;
-
     struct sensor_data *data = CONTAINER_OF(timer, struct sensor_data, reset_timer_alarm);
 
     if (data->mode != SHOCK_SENSOR_MODE_ALARM) return;
@@ -771,13 +763,6 @@ static void reset_timer_handler_alarm(struct k_timer *timer)
 
 static void increase_sensivity_warn_handler(struct k_timer *timer)
 {
-    // struct device *dev = k_timer_user_data_get(timer);
-    // if (!dev) {
-    //     LOG_ERR("Device is NULL in timer handler!");
-    //     return;
-    // }
-    // struct sensor_data *data = dev->data;
-
     struct sensor_data *data = CONTAINER_OF(timer, struct sensor_data, increase_sensivity_timer_warn);
 
     if (data->mode != SHOCK_SENSOR_MODE_ARMED) return;
@@ -786,14 +771,6 @@ static void increase_sensivity_warn_handler(struct k_timer *timer)
 
 static void increase_sensivity_main_handler(struct k_timer *timer)
 {
-    // struct device *dev = k_timer_user_data_get(timer);
-    
-    // if (!dev) {
-    //     LOG_ERR("Device is NULL in timer handler!");
-    //     return;
-    // }
-    // struct sensor_data *data = dev->data;
-
     struct sensor_data *data = CONTAINER_OF(timer, struct sensor_data, increase_sensivity_timer_main);
 
     if (data->mode != SHOCK_SENSOR_MODE_ARMED) return;
