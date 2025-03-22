@@ -12,7 +12,7 @@
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/pm/device.h>
 #include "shock-sensor.h"
-
+#include <math.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
@@ -22,6 +22,8 @@ LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
 #else
     #define ADC_READING_TYPE uint16_t
 #endif
+
+#define MAX_TAP_LEVEL 1500
 
 #define CONFIG_SEQUENCE_SAMPLES 16
 #define MIN_TAP_INTERVAL 1000 // ms
@@ -51,6 +53,8 @@ struct sensor_data {
     int selected_main_zone;
     int current_warn_zone;
     int current_main_zone;
+    bool max_level_alert_warn;
+    bool max_level_alert_main;
 
     int treshold_warn;
     int treshold_main;
@@ -79,7 +83,14 @@ struct sensor_data {
     int mode;
 };
 
-static const int warn_zones_initial[16] = {4, 5, 6, 8, 10, 12, 14, 17, 20, 23, 27, 32, 37, 43, 50, 60};
+// static const int warn_zones_initial[16] = {4, 5, 6, 8, 10, 12, 14, 17, 20, 23, 27, 32, 37, 43, 50, 60};
+static const int warn_zones_initial[16] = {4, 5, 7, 9, 12, 16, 21, 27, 36, 47, 61, 81, 106, 139, 183, 240};
+static const float koeff[16] = {
+    1.448361441, 1.428302112, 1.398579236, 1.376783165, 
+    1.352249644, 1.328153297, 1.305770936, 1.285421230, 
+    1.262515729, 1.241651128, 1.221581899, 1.200121980, 
+    1.180114338, 1.160291949, 1.140518963, 1.121353392
+};
 
 
 
@@ -245,6 +256,8 @@ static int attr_set(const struct device *dev,
         data->last_tap_time_main = current_time;
         data->max_noise_level = 0;
         data->max_noise_level_time = current_time;
+        data->max_level_alert_warn = false;
+        data->max_level_alert_main = false;
         LOG_INF("Seted warn_zone: %d", data->current_warn_zone);
         set_zones(dev, data->current_warn_zone, data->current_main_zone);
         return 0;
@@ -265,6 +278,8 @@ static int attr_set(const struct device *dev,
         data->last_tap_time_main = current_time;
         data->max_noise_level = 0;
         data->max_noise_level_time = current_time;
+        data->max_level_alert_warn = false;
+        data->max_level_alert_main = false;
         LOG_INF("Seted main_zone: %d", data->current_main_zone);
         set_zones(dev, data->current_warn_zone, data->current_main_zone);
         return 0;
@@ -291,6 +306,8 @@ static int attr_set(const struct device *dev,
         if (data->mode == SHOCK_SENSOR_MODE_DISARMED || data->mode == SHOCK_SENSOR_MODE_TURN_OFF) {
             data->current_warn_zone = data->selected_warn_zone;
             data->current_main_zone = data->selected_main_zone;
+            data->max_level_alert_warn = false;
+            data->max_level_alert_main = false;
             k_timer_stop(&data->reset_timer_alarm);
             k_timer_stop(&data->increase_sensivity_timer_warn);
             k_timer_stop(&data->increase_sensivity_timer_main);
@@ -551,25 +568,37 @@ static void adc_vbus_work_handler(struct k_work *work)
     //     debug_counter = 0;
     // }
 
-    if (amplitude_abs > data->treshold_main && data->shake_main == 0) {
+    if (amplitude_abs > data->treshold_main && data->shake_main == 0 && !data->max_level_alert_main) {
         data->shake_main = CONFIG_SHAKE_MAIN_TIME;
         if (data->main_handler) {
-            data->main_handler(dev, data->main_trigger);
-            LOG_INF("MAIN amplitude: %d", amplitude_abs);
+            if (!data->max_level_alert_main)
+            {
+                data->main_handler(dev, data->main_trigger);
+                LOG_INF("MAIN amplitude: %d", amplitude_abs);
+            } else {
+                LOG_INF("MAIN trigger disabled amplitude: %d", amplitude_abs);
+            }
             register_tap_main(data);
         } else {
             LOG_ERR("Problem with main_handler");
         }
-    } else if (amplitude_abs > data->treshold_warn && data->shake_warn == 0) {
+    } else if (amplitude_abs > data->treshold_warn && data->shake_warn == 0 && !data->max_level_alert_warn) {
         data->shake_warn = CONFIG_SHAKE_WARN_TIME;
         if (data->warn_handler) {
-            data->warn_handler(dev, data->warn_trigger);
-            LOG_INF("WARN amplitude: %d", amplitude_abs);
+            if (!data->max_level_alert_warn)
+            {
+                data->warn_handler(dev, data->warn_trigger);
+                LOG_INF("WARN amplitude: %d", amplitude_abs);
+            } else {
+                LOG_INF("WARN trigger disabled amplitude: %d", amplitude_abs);
+            }
             register_tap_warn(data);
         } else {
             LOG_ERR("Problem with warn_handler");
         }
     } else if (data->shake_warn == 0 && data->shake_main == 0) {
+        data->shake_warn = CONFIG_SHAKE_MAIN_TIME;
+        data->shake_main = CONFIG_SHAKE_WARN_TIME;
         int64_t current_time = k_uptime_get();
         if ((current_time - data->max_noise_level_time) > data->noise_sampling_interval_msec) {
             LOG_INF("Noise window reset. Previous max: %d", data->max_noise_level);
@@ -770,8 +799,13 @@ static void set_warn_zones(const struct device *dev)
 static void create_main_zones(const struct device *dev, int zone)
 {
     struct sensor_data *data = dev->data;
-    for (int i = 0; i < 16; i++) {
-        data->main_zones[i] = data->warn_zones[zone] * 2 + (i * 5); 
+    float k = koeff[data->selected_warn_zone];
+    float float_main_zones[16];
+    float_main_zones[0] = (float)data->treshold_warn * k;
+    data->main_zones[0] = (int)roundf(float_main_zones[0]);
+    for (int i = 1; i < 16; i++) {
+        float_main_zones[i] = float_main_zones[i-1] * k;
+        data->main_zones[i] = (int)roundf(float_main_zones[i]);
     }
 }
 
@@ -780,16 +814,17 @@ static void coarsering_warn(struct sensor_data *data, bool increase)
     if (increase) {
         if (data->current_warn_zone == 15) 
         {
+            data->max_level_alert_warn = true;
             LOG_INF("Warning: Minimum warn zone sensivity reached");
             k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             return;
         }
-        if (data->warn_zones[data->current_warn_zone+1] >= data->treshold_main)
-        {
-            // LOG_INF("Warning: warn zone sensivity can`t be increased due to main zone");
-            k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
-            return;
-        }
+        // if (data->warn_zones[data->current_warn_zone+1] >= data->treshold_main)
+        // {
+        //     // LOG_INF("Warning: warn zone sensivity can`t be increased due to main zone");
+        //     k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
+        //     return;
+        // }
         data->current_warn_zone++;
     } else {
         if (data->current_warn_zone == data->selected_warn_zone)
@@ -801,8 +836,9 @@ static void coarsering_warn(struct sensor_data *data, bool increase)
         if (data->max_noise_level <= data->warn_zones[data->current_warn_zone - 1])
         {
             data->current_warn_zone--; 
+            data->max_level_alert_warn = false;
         } else {
-            // LOG_INF("Warning: warn zone sensivity can`t be decreased due to noise level");
+            LOG_INF("Warning: warn zone sensivity can`t be decreased due to noise level");
             k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             return;
         }
@@ -816,6 +852,7 @@ static void coarsering_main(struct sensor_data *data, bool increase)
     if (increase) {
         if (data->current_main_zone == 15) 
         {
+            data->max_level_alert_main = true;
             LOG_INF("Warning: Minimum main zone sensivity reached");
             k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             return;
@@ -825,7 +862,7 @@ static void coarsering_main(struct sensor_data *data, bool increase)
         if (data->current_main_zone == data->selected_main_zone) 
         {
             LOG_INF("Warning: Maximum or setted main zone sensivity reached");
-            k_timer_stop(&data->increase_sensivity_timer_main);
+            // k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             return;
         }
         if (data->max_noise_level <= data->main_zones[data->current_main_zone - 1])
@@ -835,6 +872,7 @@ static void coarsering_main(struct sensor_data *data, bool increase)
                 k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
                 return;
             }
+            data->max_level_alert_main = false;
             data->current_main_zone--; 
         } else {
             LOG_INF("Warning: main zone sensivity can`t be decreased due to noise level");
