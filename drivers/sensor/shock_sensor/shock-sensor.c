@@ -96,6 +96,8 @@ static const float koeff[16] = {
     1.180114338, 1.160291949, 1.140518963, 1.121353392
 };
 
+static const float little_val = 0.01;
+static const float warn_noise_divider = 1.316;
 
 
 struct shock_sensor_dt_spec {
@@ -619,7 +621,7 @@ static void adc_vbus_work_handler(struct k_work *work)
         if ((current_time - data->max_main_noise_level_time) > data->noise_sampling_interval_msec) {
             int prev_level = data->max_main_noise_level;
             LOG_INF("MAIN noise window reset. Previous max: %d", data->max_main_noise_level);
-            data->max_main_noise_level = (int)((float)data->max_main_noise_level / koeff[data->selected_warn_zone]);
+            data->max_main_noise_level = (int)((float)data->max_main_noise_level / (koeff[data->selected_warn_zone]+little_val));
             if (prev_level == data->max_main_noise_level) {
                 data->max_main_noise_level = 0;
             }
@@ -639,7 +641,7 @@ static void adc_vbus_work_handler(struct k_work *work)
         if ((current_time - data->max_warn_noise_level_time) > data->noise_sampling_interval_msec) {
             int prev_level = data->max_warn_noise_level;
             LOG_INF("WARN noise window reset. Previous max: %d", data->max_warn_noise_level);
-            data->max_warn_noise_level = (int)((float)data->max_warn_noise_level / koeff[data->selected_warn_zone]);
+            data->max_warn_noise_level = (int)((float)data->max_warn_noise_level / warn_noise_divider);
             if (prev_level == data->max_warn_noise_level) {
                 data->max_warn_noise_level = 0;
             }
