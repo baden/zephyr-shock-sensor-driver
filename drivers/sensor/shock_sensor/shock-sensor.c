@@ -23,7 +23,7 @@ LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
     #define ADC_READING_TYPE uint16_t
 #endif
 
-#define MAX_TAP_LEVEL 1500
+#define MAX_TAP_LEVEL 1550
 
 #define CONFIG_SEQUENCE_SAMPLES 16
 #define MIN_TAP_INTERVAL 1000 // ms
@@ -294,13 +294,17 @@ static int attr_set(const struct device *dev,
             LOG_INF("Entering alarm mode for %d ms", val->val2);
         }
 
+        if (val->val1 == SHOCK_SENSOR_MODE_ALARM) {
+            return 0;
+        }
+        
         data->mode = val->val1;
 
         if (data->mode == SHOCK_SENSOR_MODE_ALARM_STOP) {
             data->mode = SHOCK_SENSOR_MODE_ARMED;
             k_timer_stop(&data->reset_timer_alarm);
-            k_timer_stop(&data->increase_sensivity_timer_warn);
-            k_timer_stop(&data->increase_sensivity_timer_main);
+            // k_timer_stop(&data->increase_sensivity_timer_warn);
+            // k_timer_stop(&data->increase_sensivity_timer_main);
             LOG_INF("Forced stop alarm mode");
         }
         if (data->mode == SHOCK_SENSOR_MODE_DISARMED || data->mode == SHOCK_SENSOR_MODE_TURN_OFF) {
@@ -609,8 +613,12 @@ static void adc_vbus_work_handler(struct k_work *work)
             }
             LOG_INF("Decrease noise level to: %d", data->max_noise_level);
             data->max_noise_level_time = current_time;
-        } else if (amplitude_abs > data->max_noise_level) {
-                    data->max_noise_level = amplitude_abs;
+        } else if (amplitude_abs >= data->max_noise_level) {
+                    if (amplitude_abs > MAX_TAP_LEVEL) {
+                        data->max_noise_level = MAX_TAP_LEVEL;
+                    } else{
+                        data->max_noise_level = amplitude_abs;
+                    }
                     data->max_noise_level_time = current_time;
                     LOG_INF("New max noise level: %d", data->max_noise_level);
                 }
