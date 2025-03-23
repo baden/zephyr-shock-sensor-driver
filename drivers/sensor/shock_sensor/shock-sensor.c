@@ -96,8 +96,8 @@ static const float koeff[16] = {
     1.180114338, 1.160291949, 1.140518963, 1.121353392
 };
 
-static const float little_val = 0.01;
-static const float warn_noise_divider = 1.316;
+static const float little_val = 0.02;
+static const float warn_noise_divider = 1.32;
 
 
 struct shock_sensor_dt_spec {
