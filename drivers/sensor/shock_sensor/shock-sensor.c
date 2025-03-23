@@ -294,10 +294,12 @@ static int attr_set(const struct device *dev,
             LOG_INF("Entering alarm mode for %d ms", val->val2);
         }
 
-        if (val->val1 != SHOCK_SENSOR_MODE_ALARM) {
-            data->mode = val->val1;
+        if (val->val1 == SHOCK_SENSOR_MODE_ALARM) {
+            return 0;
         }
         
+        data->mode = val->val1;
+
         if (data->mode == SHOCK_SENSOR_MODE_ALARM_STOP) {
             data->mode = SHOCK_SENSOR_MODE_ARMED;
             k_timer_stop(&data->reset_timer_alarm);
