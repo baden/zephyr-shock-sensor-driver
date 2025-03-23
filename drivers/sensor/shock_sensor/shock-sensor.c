@@ -614,13 +614,14 @@ static void adc_vbus_work_handler(struct k_work *work)
             LOG_INF("Decrease noise level to: %d", data->max_noise_level);
             data->max_noise_level_time = current_time;
         } else if (amplitude_abs >= data->max_noise_level) {
+                    int old_noise_level = data->max_noise_level;
                     if (amplitude_abs > MAX_TAP_LEVEL) {
                         data->max_noise_level = MAX_TAP_LEVEL;
                     } else{
                         data->max_noise_level = amplitude_abs;
                     }
                     data->max_noise_level_time = current_time;
-                    LOG_INF("New max noise level: %d", data->max_noise_level);
+                    if (old_noise_level != data->max_noise_level) LOG_INF("New max noise level: %d", data->max_noise_level);
                 }
     }
     
