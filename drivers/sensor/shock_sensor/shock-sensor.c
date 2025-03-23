@@ -611,7 +611,7 @@ static void adc_vbus_work_handler(struct k_work *work)
             data->max_noise_level_time = current_time;
         } else if (amplitude_abs >= data->max_noise_level) {
                     if (amplitude_abs > MAX_TAP_LEVEL) {
-                        data->max_noise_level = MAX_TAP_LEVEL
+                        data->max_noise_level = MAX_TAP_LEVEL;
                     } else{
                         data->max_noise_level = amplitude_abs;
                     }
