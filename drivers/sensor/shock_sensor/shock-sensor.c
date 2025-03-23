@@ -601,8 +601,13 @@ static void adc_vbus_work_handler(struct k_work *work)
         data->shake_main = CONFIG_SHAKE_WARN_TIME;
         int64_t current_time = k_uptime_get();
         if ((current_time - data->max_noise_level_time) > data->noise_sampling_interval_msec) {
+            int prev_level = data->max_noise_level;
             LOG_INF("Noise window reset. Previous max: %d", data->max_noise_level);
-            data->max_noise_level = amplitude_abs;
+            data->max_noise_level = (int)((float)data->max_noise_level / koeff[data->selected_warn_zone]);
+            if (prev_level == data->max_noise_level) {
+                data->max_noise_level = 0;
+            }
+            LOG_INF("Decrease noise level to: %d", data->max_noise_level);
             data->max_noise_level_time = current_time;
         } else if (amplitude_abs > data->max_noise_level) {
                     data->max_noise_level = amplitude_abs;
