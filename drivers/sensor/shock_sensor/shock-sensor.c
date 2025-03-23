@@ -240,6 +240,8 @@ static int attr_set(const struct device *dev,
         LOG_INF("Seted noise_sampling_interval_sec: %lld", data->noise_sampling_interval_sec);
         data->max_main_noise_level = 0;
         data->max_main_noise_level_time = k_uptime_get();
+        data->max_warn_noise_level = 0;
+        data->max_warn_noise_level_time = k_uptime_get();
         return 0;
     }
 
@@ -260,6 +262,8 @@ static int attr_set(const struct device *dev,
         data->last_tap_time_main = current_time;
         data->max_main_noise_level = 0;
         data->max_main_noise_level_time = current_time;
+        data->max_warn_noise_level = 0;
+        data->max_warn_noise_level_time = current_time;
         data->max_level_alert_warn = false;
         data->max_level_alert_main = false;
         LOG_INF("Seted warn_zone: %d", data->current_warn_zone);
@@ -282,6 +286,8 @@ static int attr_set(const struct device *dev,
         data->last_tap_time_main = current_time;
         data->max_main_noise_level = 0;
         data->max_main_noise_level_time = current_time;
+        data->max_warn_noise_level = 0;
+        data->max_warn_noise_level_time = current_time;
         data->max_level_alert_warn = false;
         data->max_level_alert_main = false;
         LOG_INF("Seted main_zone: %d", data->current_main_zone);
@@ -331,6 +337,8 @@ static int attr_set(const struct device *dev,
             k_timer_stop(&data->increase_sensivity_timer_main);
             data->max_main_noise_level = 0;
             data->max_main_noise_level_time = current_time;
+            data->max_warn_noise_level = 0;
+            data->max_warn_noise_level_time = current_time;
             // k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             // k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
             LOG_INF("Sensor is armed");
@@ -610,12 +618,12 @@ static void adc_vbus_work_handler(struct k_work *work)
         int64_t current_time = k_uptime_get();
         if ((current_time - data->max_main_noise_level_time) > data->noise_sampling_interval_msec) {
             int prev_level = data->max_main_noise_level;
-            LOG_INF("Noise window reset. Previous max: %d", data->max_main_noise_level);
+            LOG_INF("MAIN noise window reset. Previous max: %d", data->max_main_noise_level);
             data->max_main_noise_level = (int)((float)data->max_main_noise_level / koeff[data->selected_warn_zone]);
             if (prev_level == data->max_main_noise_level) {
                 data->max_main_noise_level = 0;
             }
-            LOG_INF("Decrease noise level to: %d", data->max_main_noise_level);
+            LOG_INF("Decrease MAIN noise level to: %d", data->max_main_noise_level);
             data->max_main_noise_level_time = current_time;
         } else if (amplitude_abs >= data->max_main_noise_level) {
                     int old_noise_level = data->max_main_noise_level;
@@ -625,8 +633,29 @@ static void adc_vbus_work_handler(struct k_work *work)
                         data->max_main_noise_level = amplitude_abs;
                     }
                     data->max_main_noise_level_time = current_time;
-                    if (old_noise_level != data->max_main_noise_level) LOG_INF("New max noise level: %d", data->max_main_noise_level);
-                }
+                    if (old_noise_level != data->max_main_noise_level) LOG_INF("New MAIN max noise level: %d", data->max_main_noise_level);
+        }
+
+        if ((current_time - data->max_warn_noise_level_time) > data->noise_sampling_interval_msec) {
+            int prev_level = data->max_warn_noise_level;
+            LOG_INF("WARN noise window reset. Previous max: %d", data->max_warn_noise_level);
+            data->max_warn_noise_level = (int)((float)data->max_warn_noise_level / koeff[data->selected_warn_zone]);
+            if (prev_level == data->max_warn_noise_level) {
+                data->max_warn_noise_level = 0;
+            }
+            LOG_INF("Decrease WARN noise level to: %d", data->max_warn_noise_level);
+            data->max_warn_noise_level_time = current_time;
+        } else if (amplitude_abs >= data->max_warn_noise_level) {
+                    int old_noise_level = data->max_warn_noise_level;
+                    if (amplitude_abs > MAX_WARN_TAP_LEVEL) {
+                        data->max_warn_noise_level = MAX_WARN_TAP_LEVEL;
+                    } else{
+                        data->max_warn_noise_level = amplitude_abs;
+                    }
+                    data->max_warn_noise_level_time = current_time;
+                    if (old_noise_level != data->max_warn_noise_level) LOG_INF("New WARN max noise level: %d", data->max_warn_noise_level);
+        }
+
     }
     
 
@@ -851,7 +880,7 @@ static void coarsering_warn(struct sensor_data *data, bool increase)
             // k_timer_stop(&data->increase_sensivity_timer_warn);
             return;
         }
-        if (data->max_main_noise_level <= data->warn_zones[data->current_warn_zone - 1])
+        if (data->max_warn_noise_level <= data->warn_zones[data->current_warn_zone - 1])
         {
             data->current_warn_zone--; 
             data->max_level_alert_warn = false;
