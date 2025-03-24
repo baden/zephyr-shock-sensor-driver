@@ -23,7 +23,7 @@ LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
     #define ADC_READING_TYPE uint16_t
 #endif
 
-#define MAX_MAIN_TAP_LEVEL 1551
+#define MAX_MAIN_TAP_LEVEL 1201
 #define MAX_WARN_TAP_LEVEL 241
 
 #define CONFIG_SEQUENCE_SAMPLES 16
@@ -48,8 +48,8 @@ struct sensor_data {
     sensor_trigger_handler_t main_handler;
     const struct sensor_trigger *main_trigger;
 
-    int warn_zones[16];
-    int main_zones[16];
+    int warn_zones[10];
+    int main_zones[10];
     int selected_warn_zone;
     int selected_main_zone;
     int current_warn_zone;
@@ -88,16 +88,22 @@ struct sensor_data {
 };
 
 // static const int warn_zones_initial[16] = {4, 5, 6, 8, 10, 12, 14, 17, 20, 23, 27, 32, 37, 43, 50, 60};
-static const int warn_zones_initial[16] = {4, 5, 7, 9, 12, 16, 21, 27, 36, 47, 61, 81, 106, 139, 183, 240};
-static const float koeff[16] = {
-    1.448361441, 1.428302112, 1.398579236, 1.376783165, 
-    1.352249644, 1.328153297, 1.305770936, 1.285421230, 
-    1.262515729, 1.241651128, 1.221581899, 1.200121980, 
-    1.180114338, 1.160291949, 1.140518963, 1.121353392
+static const int warn_zones_initial[10] = {6, 10, 16, 25, 39, 61, 97, 152, 240};
+static const float koeff[10] = {
+    1.76893602,
+    1.698646465,
+    1.614054238,
+    1.539948249,
+    1.472733358,
+    1.408677779,
+    1.34705442,
+    1.285999948,
+    1.229514814,
+    1.174618943
 };
 
 static const float little_val = 0.03;
-static const float warn_noise_divider = 1.33;
+static const float warn_noise_divider = 1.6;
 
 
 struct shock_sensor_dt_spec {
@@ -249,12 +255,12 @@ static int attr_set(const struct device *dev,
 
     if (chan == (enum sensor_channel)SHOCK_SENSOR_CHANNEL_WARN_ZONE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
         int64_t current_time = k_uptime_get();
-        data->current_warn_zone = 16 - val->val1; 
+        data->current_warn_zone = 10 - val->val1; 
         if (data->current_warn_zone < 0) {
             data->current_warn_zone = 0;
         }
-        if (data->current_warn_zone > 15) {
-            data->current_warn_zone = 15;
+        if (data->current_warn_zone > 9) {
+            data->current_warn_zone = 9;
         }
         data->selected_warn_zone = data->current_warn_zone;
         create_main_zones(dev, val->val1);
@@ -275,12 +281,12 @@ static int attr_set(const struct device *dev,
 
     if (chan == (enum sensor_channel)SHOCK_SENSOR_CHANNEL_MAIN_ZONE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
         int64_t current_time = k_uptime_get();
-        data->current_main_zone = 16 - val->val1;
+        data->current_main_zone = 10 - val->val1;
         if (data->current_main_zone < 0) {
             data->current_main_zone = 0;
         }
-        if (data->current_main_zone > 15) {
-            data->current_main_zone = 15;
+        if (data->current_main_zone > 9) {
+            data->current_main_zone = 9;
         }
         data->selected_main_zone = data->current_main_zone;
         data->current_warn_zone = data->selected_warn_zone;
@@ -840,7 +846,7 @@ static void set_zones(const struct device *dev, int warn_zone, int main_zone)
 static void set_warn_zones(const struct device *dev)
 {
     struct sensor_data *data = dev->data;
-    for (int i = 0; i < 16; i++) {
+    for (int i = 0; i < 10; i++) {
         data->warn_zones[i] = warn_zones_initial[i]; 
     }
 }
@@ -849,10 +855,10 @@ static void create_main_zones(const struct device *dev, int zone)
 {
     struct sensor_data *data = dev->data;
     float k = koeff[data->selected_warn_zone];
-    float float_main_zones[16];
+    float float_main_zones[10];
     float_main_zones[0] = (float)data->treshold_warn * k;
     data->main_zones[0] = (int)roundf(float_main_zones[0]);
-    for (int i = 1; i < 16; i++) {
+    for (int i = 1; i < 10; i++) {
         float_main_zones[i] = float_main_zones[i-1] * k;
         data->main_zones[i] = (int)roundf(float_main_zones[i]);
     }
@@ -861,7 +867,7 @@ static void create_main_zones(const struct device *dev, int zone)
 static void coarsering_warn(struct sensor_data *data, bool increase)
 {
     if (increase) {
-        if (data->current_warn_zone == 15) 
+        if (data->current_warn_zone == 9) 
         {
             data->max_level_alert_warn = true;
             LOG_INF("Warning: Minimum warn zone sensivity reached");
@@ -899,7 +905,7 @@ static void coarsering_warn(struct sensor_data *data, bool increase)
 static void coarsering_main(struct sensor_data *data, bool increase)
 {
     if (increase) {
-        if (data->current_main_zone == 15) 
+        if (data->current_main_zone == 9) 
         {
             data->max_level_alert_main = true;
             LOG_INF("Warning: Minimum main zone sensivity reached");
