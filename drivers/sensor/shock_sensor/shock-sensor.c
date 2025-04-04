@@ -254,9 +254,9 @@ static int attr_set(const struct device *dev,
     }
 
     if (chan == (enum sensor_channel)SHOCK_SENSOR_CHANNEL_WARN_ZONE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
-        val->val1 /= 10;
+        int value = val->val1 / 10;
         int64_t current_time = k_uptime_get();
-        data->current_warn_zone = 10 - val->val1; 
+        data->current_warn_zone = 10 - value; 
         if (data->current_warn_zone < 0) {
             data->current_warn_zone = 0;
         }
@@ -264,7 +264,7 @@ static int attr_set(const struct device *dev,
             data->current_warn_zone = 9;
         }
         data->selected_warn_zone = data->current_warn_zone;
-        create_main_zones(dev, val->val1);
+        create_main_zones(dev, data->current_warn_zone);
         data->current_main_zone = 0;
         data->selected_main_zone = 0;
         data->last_tap_time_warn = current_time;
@@ -281,9 +281,9 @@ static int attr_set(const struct device *dev,
     }
 
     if (chan == (enum sensor_channel)SHOCK_SENSOR_CHANNEL_MAIN_ZONE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
-        val->val1 /= 10;
+        int value = val->val1 / 10;
         int64_t current_time = k_uptime_get();
-        data->current_main_zone = 10 - val->val1;
+        data->current_main_zone = 10 - value;
         if (data->current_main_zone < 0) {
             data->current_main_zone = 0;
         }
