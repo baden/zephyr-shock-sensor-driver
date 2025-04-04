@@ -258,7 +258,7 @@ static int attr_set(const struct device *dev,
         if (val->val1 == 0) {
             data->warn_zone_active = false;
             data->current_warn_zone = data->selected_warn_zone;
-            LOG_DBG("WARN_ZONE disabled");
+            LOG_INF("WARN_ZONE disabled");
             return 0;
         }
         int value = val->val1 / 10;
@@ -292,7 +292,7 @@ static int attr_set(const struct device *dev,
         if (val->val1 == 0) {
             data->main_zone_active = false;
             data->current_main_zone = data->selected_main_zone;
-            LOG_DBG("MAIN_ZONE disabled");
+            LOG_INF("MAIN_ZONE disabled");
             return 0;
         }
         int value = val->val1 / 10;
