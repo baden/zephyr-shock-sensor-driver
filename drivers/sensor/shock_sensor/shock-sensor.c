@@ -640,6 +640,9 @@ static void adc_vbus_work_handler(struct k_work *work)
     } else if (data->shake_warn == 0 && data->shake_main == 0) {
         data->shake_warn = CONFIG_SHAKE_MAIN_TIME;
         data->shake_main = CONFIG_SHAKE_WARN_TIME;
+        if (!data->main_zone_active && !data->warn_zone_active) {
+            goto end;
+        }
         int64_t current_time = k_uptime_get();
         if ((current_time - data->max_main_noise_level_time) > data->noise_sampling_interval_msec) {
             int prev_level = data->max_main_noise_level;
