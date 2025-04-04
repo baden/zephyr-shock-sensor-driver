@@ -259,8 +259,7 @@ static int attr_set(const struct device *dev,
             data->warn_zone_active = false;
             data->current_warn_zone = 9;
             data->selected_warn_zone = 9;
-            data->current_main_zone = 0;
-            data->selected_main_zone = 0;
+            data->current_main_zone = data->selected_main_zone;
             set_zones(dev, data->current_warn_zone, data->current_main_zone);
             LOG_INF("WARN_ZONE disabled");
             return 0;
@@ -277,8 +276,7 @@ static int attr_set(const struct device *dev,
         data->warn_zone_active = true;
         data->selected_warn_zone = data->current_warn_zone;
         create_main_zones(dev, data->current_warn_zone);
-        data->current_main_zone = 0;
-        data->selected_main_zone = 0;
+        data->current_main_zone = data->selected_main_zone;
         data->last_tap_time_warn = current_time;
         data->last_tap_time_main = current_time;
         data->max_main_noise_level = 0;
