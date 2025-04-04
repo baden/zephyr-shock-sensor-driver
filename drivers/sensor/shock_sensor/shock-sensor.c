@@ -89,7 +89,7 @@ struct sensor_data {
 };
 
 // static const int warn_zones_initial[16] = {4, 5, 6, 8, 10, 12, 14, 17, 20, 23, 27, 32, 37, 43, 50, 60};
-static const int warn_zones_initial[10] = {6, 10, 16, 25, 39, 61, 97, 152, 240};
+static const int warn_zones_initial[10] = {4, 6, 10, 16, 25, 39, 61, 97, 152, 240};
 static const float koeff[10] = {
     1.76893602,
     1.698646465,
@@ -257,7 +257,11 @@ static int attr_set(const struct device *dev,
     if (chan == (enum sensor_channel)SHOCK_SENSOR_CHANNEL_WARN_ZONE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
         if (val->val1 == 0) {
             data->warn_zone_active = false;
-            data->current_warn_zone = data->selected_warn_zone;
+            data->current_warn_zone = 9;
+            data->selected_warn_zone = 9;
+            data->current_main_zone = 0;
+            data->selected_main_zone = 0;
+            set_zones(dev, data->current_warn_zone, data->current_main_zone);
             LOG_INF("WARN_ZONE disabled");
             return 0;
         }
@@ -856,7 +860,6 @@ static void increase_sensivity_main_handler(struct k_timer *timer)
 static void set_zones(const struct device *dev, int warn_zone, int main_zone)
 {
     struct sensor_data *data = dev->data;
-    
     data->selected_warn_zone = warn_zone;
     data->current_warn_zone = warn_zone;
     create_main_zones(dev, warn_zone);
