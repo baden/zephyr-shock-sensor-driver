@@ -2,11 +2,25 @@
 
 #include <zephyr/drivers/adc.h>
 
-struct shock_sensor_dt_spec {
-	const struct adc_dt_spec port;
-    uint32_t sampling_period_ms;
+enum shock_sensor_channel {
+    SHOCK_SENSOR_MODE=65,
+    SHOCK_SENSOR_CHANNEL_WARN_ZONE,
+    SHOCK_SENSOR_CHANNEL_MAIN_ZONE,
+    SHOCK_SENSOR_INCREASE_SENSIVITY_INTERVAL_SEC,
+    SHOCK_SENSOR_NOISE_SAMPLING_TIME_SEC,
 };
 
+enum shock_sensor_attrs {
+    SHOCK_SENSOR_SPECIAL_ATTRS=32,
+};
+
+enum shock_sensor_mode {
+    SHOCK_SENSOR_MODE_ARMED=0,
+    SHOCK_SENSOR_MODE_DISARMED,
+    SHOCK_SENSOR_MODE_TURN_OFF,
+    SHOCK_SENSOR_MODE_ALARM,
+    SHOCK_SENSOR_MODE_ALARM_STOP,
+};
 /**
  * @brief Get shock sensor information from devicetree.
  *
@@ -34,4 +48,3 @@ __subsystem struct shock_sensor_driver_api {
     sensor_get_decoder_t get_decoder;
     sensor_submit_t submit;
 };
-    
