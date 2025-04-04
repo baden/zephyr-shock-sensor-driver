@@ -56,7 +56,8 @@ struct sensor_data {
     int current_main_zone;
     bool max_level_alert_warn;
     bool max_level_alert_main;
-
+    bool warn_zone_active;
+    bool main_zone_active;
     int treshold_warn;
     int treshold_main;
 
@@ -88,7 +89,7 @@ struct sensor_data {
 };
 
 // static const int warn_zones_initial[16] = {4, 5, 6, 8, 10, 12, 14, 17, 20, 23, 27, 32, 37, 43, 50, 60};
-static const int warn_zones_initial[10] = {6, 10, 16, 25, 39, 61, 97, 152, 240};
+static const int warn_zones_initial[10] = {4, 6, 10, 16, 25, 39, 61, 97, 152, 240};
 static const float koeff[10] = {
     1.76893602,
     1.698646465,
@@ -254,6 +255,16 @@ static int attr_set(const struct device *dev,
     }
 
     if (chan == (enum sensor_channel)SHOCK_SENSOR_CHANNEL_WARN_ZONE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
+        if (val->val1 == 0) {
+            data->warn_zone_active = false;
+            data->current_warn_zone = 9;
+            data->selected_warn_zone = 9;
+            data->current_main_zone = 0;
+            data->selected_main_zone = 0;
+            set_zones(dev, data->current_warn_zone, data->current_main_zone);
+            LOG_INF("WARN_ZONE disabled");
+            return 0;
+        }
         int value = val->val1 / 10;
         int64_t current_time = k_uptime_get();
         data->current_warn_zone = 10 - value; 
@@ -263,6 +274,7 @@ static int attr_set(const struct device *dev,
         if (data->current_warn_zone > 9) {
             data->current_warn_zone = 9;
         }
+        data->warn_zone_active = true;
         data->selected_warn_zone = data->current_warn_zone;
         create_main_zones(dev, data->current_warn_zone);
         data->current_main_zone = 0;
@@ -281,6 +293,12 @@ static int attr_set(const struct device *dev,
     }
 
     if (chan == (enum sensor_channel)SHOCK_SENSOR_CHANNEL_MAIN_ZONE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
+        if (val->val1 == 0) {
+            data->main_zone_active = false;
+            data->current_main_zone = data->selected_main_zone;
+            LOG_INF("MAIN_ZONE disabled");
+            return 0;
+        }
         int value = val->val1 / 10;
         int64_t current_time = k_uptime_get();
         data->current_main_zone = 10 - value;
@@ -290,6 +308,7 @@ static int attr_set(const struct device *dev,
         if (data->current_main_zone > 9) {
             data->current_main_zone = 9;
         }
+        data->main_zone_active = true;
         data->selected_main_zone = data->current_main_zone;
         data->current_warn_zone = data->selected_warn_zone;
         data->last_tap_time_warn = current_time;
@@ -594,7 +613,7 @@ static void adc_vbus_work_handler(struct k_work *work)
     //     debug_counter = 0;
     // }
 
-    if (amplitude_abs > data->treshold_main && data->shake_main == 0 && !data->max_level_alert_main) {
+    if (amplitude_abs > data->treshold_main && data->shake_main == 0 && !data->max_level_alert_main && data->main_zone_active) {
         data->shake_main = CONFIG_SHAKE_MAIN_TIME;
         if (data->main_handler) {
             if (!data->max_level_alert_main)
@@ -608,7 +627,7 @@ static void adc_vbus_work_handler(struct k_work *work)
         } else {
             LOG_ERR("Problem with main_handler");
         }
-    } else if (amplitude_abs > data->treshold_warn && data->shake_warn == 0 && !data->max_level_alert_warn) {
+    } else if (amplitude_abs > data->treshold_warn && data->shake_warn == 0 && !data->max_level_alert_warn && data->warn_zone_active) {
         data->shake_warn = CONFIG_SHAKE_WARN_TIME;
         if (data->warn_handler) {
             if (!data->max_level_alert_warn)
@@ -625,6 +644,9 @@ static void adc_vbus_work_handler(struct k_work *work)
     } else if (data->shake_warn == 0 && data->shake_main == 0) {
         data->shake_warn = CONFIG_SHAKE_MAIN_TIME;
         data->shake_main = CONFIG_SHAKE_WARN_TIME;
+        if (!data->main_zone_active && !data->warn_zone_active) {
+            goto end;
+        }
         int64_t current_time = k_uptime_get();
         if ((current_time - data->max_main_noise_level_time) > data->noise_sampling_interval_msec) {
             int prev_level = data->max_main_noise_level;
@@ -821,6 +843,7 @@ static void increase_sensivity_warn_handler(struct k_timer *timer)
     struct sensor_data *data = CONTAINER_OF(timer, struct sensor_data, increase_sensivity_timer_warn);
 
     if (data->mode != SHOCK_SENSOR_MODE_ARMED) return;
+    if (data->warn_zone_active == false) return;
     coarsering_warn(data, false);
 }
 
@@ -829,6 +852,7 @@ static void increase_sensivity_main_handler(struct k_timer *timer)
     struct sensor_data *data = CONTAINER_OF(timer, struct sensor_data, increase_sensivity_timer_main);
 
     if (data->mode != SHOCK_SENSOR_MODE_ARMED) return;
+    if (data->main_zone_active == false) return;
     coarsering_main(data, false);
     
 }
@@ -836,7 +860,6 @@ static void increase_sensivity_main_handler(struct k_timer *timer)
 static void set_zones(const struct device *dev, int warn_zone, int main_zone)
 {
     struct sensor_data *data = dev->data;
-    
     data->selected_warn_zone = warn_zone;
     data->current_warn_zone = warn_zone;
     create_main_zones(dev, warn_zone);
