@@ -257,6 +257,8 @@ static int attr_set(const struct device *dev,
         return 0;
     }
 
+    int64_t current_time = k_uptime_get();
+    
     if (chan == (enum sensor_channel)SHOCK_SENSOR_CHANNEL_WARN_ZONE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
         if (val->val1 == 0) {
             data->warn_zone_active = false;
