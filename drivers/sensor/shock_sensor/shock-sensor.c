@@ -325,55 +325,129 @@ static int attr_set(const struct device *dev,
     }
 
     if (chan == (enum sensor_channel)SHOCK_SENSOR_MODE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
+        // LOG_INF("Current mode: %d -> %d", data->mode, val->val1);
+        switch (data->mode) {
+            case SHOCK_SENSOR_MODE_ARMED:
+                switch (val->val1) {
+                    case SHOCK_SENSOR_MODE_ARMED:
+                        return 0;
+                    case SHOCK_SENSOR_MODE_DISARMED:
+                        data->mode = SHOCK_SENSOR_MODE_DISARMED;
+                        data->current_warn_zone = data->selected_warn_zone;
+                        data->current_main_zone = data->selected_main_zone;
+                        data->max_level_alert_warn = false;
+                        data->max_level_alert_main = false;
+                        k_timer_stop(&data->reset_timer_alarm);
+                        k_timer_stop(&data->increase_sensivity_timer_warn);
+                        k_timer_stop(&data->increase_sensivity_timer_main);
+                        set_zones(dev, data->current_warn_zone, data->current_main_zone);
+                        LOG_INF("Sensor is forced to disarmed mode");
+                        return 0;
+                    case SHOCK_SENSOR_MODE_ALARM_STOP:
+                        return 0;
+                    default:
+                        return -ENOTSUP;
+                }
+            case SHOCK_SENSOR_MODE_DISARMED:
+                switch (val->val1) {
+                    case SHOCK_SENSOR_MODE_ARMED:
+                        data->mode = SHOCK_SENSOR_MODE_ARMED;
+                        int64_t current_time = k_uptime_get();
+                        data->last_tap_time_warn = current_time;
+                        data->last_tap_time_main = current_time;
+                        k_timer_stop(&data->reset_timer_alarm);
+                        k_timer_stop(&data->increase_sensivity_timer_warn);
+                        k_timer_stop(&data->increase_sensivity_timer_main);
+                        data->max_main_noise_level = 0;
+                        data->max_main_noise_level_time = current_time;
+                        data->max_warn_noise_level = 0;
+                        data->max_warn_noise_level_time = current_time;
+                        LOG_INF("Sensor is armed");
+                        return 0;
+                    case SHOCK_SENSOR_MODE_DISARMED:
+                        return 0;
+                    case SHOCK_SENSOR_MODE_ALARM_STOP:
+                        return 0;
+                    default:
+                        return -ENOTSUP;
+                }
+            case SHOCK_SENSOR_MODE_ALARM:
+                switch (val->val1) {
+                    case SHOCK_SENSOR_MODE_ARMED:
+                        return 0;
+                    case SHOCK_SENSOR_MODE_DISARMED:
+                        data->mode = SHOCK_SENSOR_MODE_DISARMED;
+                        data->current_warn_zone = data->selected_warn_zone;
+                        data->current_main_zone = data->selected_main_zone;
+                        data->max_level_alert_warn = false;
+                        data->max_level_alert_main = false;
+                        k_timer_stop(&data->reset_timer_alarm);
+                        k_timer_stop(&data->increase_sensivity_timer_warn);
+                        k_timer_stop(&data->increase_sensivity_timer_main);
+                        set_zones(dev, data->current_warn_zone, data->current_main_zone);
+                        LOG_INF("Sensor is forced to disarmed mode");
+                        return 0;
+                    case SHOCK_SENSOR_MODE_ALARM_STOP:
+                        k_timer_start(&data->reset_timer_alarm, K_MSEC(STOP_ALARM_INTERVAL), K_NO_WAIT);
+                        LOG_INF("Alarm mode stoped in %d ms", STOP_ALARM_INTERVAL);
+                        return 0;
+                    default:
+                        return -ENOTSUP;
+                }
+            case SHOCK_SENSOR_MODE_ALARM_STOP:
+                return 0;
+            default:
+                return -ENOTSUP;
+        }
+
+
+        // if (val->val1 == SHOCK_SENSOR_MODE_ALARM && data->mode == SHOCK_SENSOR_MODE_ARMED) { 
+        //     data->mode = SHOCK_SENSOR_MODE_ALARM;
+        //     k_timer_start(&data->reset_timer_alarm, K_MSEC(val->val2), K_NO_WAIT);
+        //     LOG_INF("Entering alarm mode for %d ms", val->val2);
+        // }
+
+        // if (val->val1 == SHOCK_SENSOR_MODE_ALARM) {
+        //     return 0;
+        // }
         
+        // data->mode = val->val1;
 
-        if (val->val1 == SHOCK_SENSOR_MODE_ALARM && data->mode == SHOCK_SENSOR_MODE_ARMED) { 
-            data->mode = SHOCK_SENSOR_MODE_ALARM;
-            k_timer_start(&data->reset_timer_alarm, K_MSEC(val->val2), K_NO_WAIT);
-            LOG_INF("Entering alarm mode for %d ms", val->val2);
-        }
-
-        if (val->val1 == SHOCK_SENSOR_MODE_ALARM) {
-            return 0;
-        }
-        
-        data->mode = val->val1;
-
-        if (data->mode == SHOCK_SENSOR_MODE_ALARM_STOP) {
-            // data->mode = SHOCK_SENSOR_MODE_ARMED;
-            // k_timer_stop(&data->reset_timer_alarm);
-            k_timer_start(&data->reset_timer_alarm, K_MSEC(STOP_ALARM_INTERVAL), K_NO_WAIT);
-            // k_timer_stop(&data->increase_sensivity_timer_warn);
-            // k_timer_stop(&data->increase_sensivity_timer_main);
-            LOG_INF("Alarm mode stoped in %d ms", STOP_ALARM_INTERVAL);
-        }
-        if (data->mode == SHOCK_SENSOR_MODE_DISARMED) {
-            data->current_warn_zone = data->selected_warn_zone;
-            data->current_main_zone = data->selected_main_zone;
-            data->max_level_alert_warn = false;
-            data->max_level_alert_main = false;
-            k_timer_stop(&data->reset_timer_alarm);
-            k_timer_stop(&data->increase_sensivity_timer_warn);
-            k_timer_stop(&data->increase_sensivity_timer_main);
-            set_zones(dev, data->current_warn_zone, data->current_main_zone);
-            LOG_INF("Sensor is forced to disarmed mode");
-        }
-        if (data->mode == SHOCK_SENSOR_MODE_ARMED) {
-            int64_t current_time = k_uptime_get();
-            data->last_tap_time_warn = current_time;
-            data->last_tap_time_main = current_time;
-            k_timer_stop(&data->reset_timer_alarm);
-            k_timer_stop(&data->increase_sensivity_timer_warn);
-            k_timer_stop(&data->increase_sensivity_timer_main);
-            data->max_main_noise_level = 0;
-            data->max_main_noise_level_time = current_time;
-            data->max_warn_noise_level = 0;
-            data->max_warn_noise_level_time = current_time;
-            // k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
-            // k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
-            LOG_INF("Sensor is armed");
-        }
-        return 0;
+        // if (data->mode == SHOCK_SENSOR_MODE_ALARM_STOP) {
+        //     // data->mode = SHOCK_SENSOR_MODE_ARMED;
+        //     // k_timer_stop(&data->reset_timer_alarm);
+        //     k_timer_start(&data->reset_timer_alarm, K_MSEC(STOP_ALARM_INTERVAL), K_NO_WAIT);
+        //     // k_timer_stop(&data->increase_sensivity_timer_warn);
+        //     // k_timer_stop(&data->increase_sensivity_timer_main);
+        //     LOG_INF("Alarm mode stoped in %d ms", STOP_ALARM_INTERVAL);
+        // }
+        // if (data->mode == SHOCK_SENSOR_MODE_DISARMED) {
+        //     data->current_warn_zone = data->selected_warn_zone;
+        //     data->current_main_zone = data->selected_main_zone;
+        //     data->max_level_alert_warn = false;
+        //     data->max_level_alert_main = false;
+        //     k_timer_stop(&data->reset_timer_alarm);
+        //     k_timer_stop(&data->increase_sensivity_timer_warn);
+        //     k_timer_stop(&data->increase_sensivity_timer_main);
+        //     set_zones(dev, data->current_warn_zone, data->current_main_zone);
+        //     LOG_INF("Sensor is forced to disarmed mode");
+        // }
+        // if (data->mode == SHOCK_SENSOR_MODE_ARMED) {
+        //     int64_t current_time = k_uptime_get();
+        //     data->last_tap_time_warn = current_time;
+        //     data->last_tap_time_main = current_time;
+        //     k_timer_stop(&data->reset_timer_alarm);
+        //     k_timer_stop(&data->increase_sensivity_timer_warn);
+        //     k_timer_stop(&data->increase_sensivity_timer_main);
+        //     data->max_main_noise_level = 0;
+        //     data->max_main_noise_level_time = current_time;
+        //     data->max_warn_noise_level = 0;
+        //     data->max_warn_noise_level_time = current_time;
+        //     // k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
+        //     // k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
+        //     LOG_INF("Sensor is armed");
+        // }
+        // return 0;
     }
 
     return -ENOTSUP;
@@ -621,9 +695,10 @@ static void adc_vbus_work_handler(struct k_work *work)
         if (data->main_handler) {
             if (!data->max_level_alert_main)
             {
-                data->main_handler(dev, data->main_trigger);
                 data->mode = SHOCK_SENSOR_MODE_ALARM;
+                data->main_handler(dev, data->main_trigger);  
                 LOG_INF("MAIN amplitude: %d", amplitude_abs);
+                // LOG_INF("MAIN amplitude: %d %d", amplitude_abs, data->mode);
                 register_tap_main(data);
             } else {
                 LOG_INF("MAIN trigger disabled amplitude: %d", amplitude_abs);
