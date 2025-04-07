@@ -347,7 +347,7 @@ static int attr_set(const struct device *dev,
             // k_timer_stop(&data->increase_sensivity_timer_main);
             LOG_INF("Alarm mode stoped in %d ms", STOP_ALARM_INTERVAL);
         }
-        if (data->mode == SHOCK_SENSOR_MODE_DISARMED || data->mode == SHOCK_SENSOR_MODE_TURN_OFF) {
+        if (data->mode == SHOCK_SENSOR_MODE_DISARMED) {
             data->current_warn_zone = data->selected_warn_zone;
             data->current_main_zone = data->selected_main_zone;
             data->max_level_alert_warn = false;
