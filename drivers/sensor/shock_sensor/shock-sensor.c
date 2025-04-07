@@ -27,7 +27,9 @@ LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
 #define MAX_WARN_TAP_LEVEL 241
 
 #define CONFIG_SEQUENCE_SAMPLES 16
-#define MIN_TAP_INTERVAL 1000 // ms
+#define MIN_TAP_INTERVAL 2000 // ms
+#define STOP_ALARM_INTERVAL 5000
+
 #define ADC_READ_MAX_ATTEMPTS 3
 
 struct sensor_data {
@@ -338,11 +340,12 @@ static int attr_set(const struct device *dev,
         data->mode = val->val1;
 
         if (data->mode == SHOCK_SENSOR_MODE_ALARM_STOP) {
-            data->mode = SHOCK_SENSOR_MODE_ARMED;
-            k_timer_stop(&data->reset_timer_alarm);
+            // data->mode = SHOCK_SENSOR_MODE_ARMED;
+            // k_timer_stop(&data->reset_timer_alarm);
+            k_timer_start(&data->reset_timer_alarm, K_MSEC(STOP_ALARM_INTERVAL), K_NO_WAIT);
             // k_timer_stop(&data->increase_sensivity_timer_warn);
             // k_timer_stop(&data->increase_sensivity_timer_main);
-            LOG_INF("Forced stop alarm mode");
+            LOG_INF("Alarm mode stoped in %d ms", STOP_ALARM_INTERVAL);
         }
         if (data->mode == SHOCK_SENSOR_MODE_DISARMED || data->mode == SHOCK_SENSOR_MODE_TURN_OFF) {
             data->current_warn_zone = data->selected_warn_zone;
@@ -611,31 +614,36 @@ static void adc_vbus_work_handler(struct k_work *work)
     //     debug_counter = 0;
     // }
 
+    int64_t current_time = k_uptime_get();
+
     if (amplitude_abs > data->treshold_main && data->shake_main == 0 && !data->max_level_alert_main && data->main_zone_active) {
         data->shake_main = CONFIG_SHAKE_MAIN_TIME;
         if (data->main_handler) {
             if (!data->max_level_alert_main)
             {
                 data->main_handler(dev, data->main_trigger);
+                data->mode = SHOCK_SENSOR_MODE_ALARM;
                 LOG_INF("MAIN amplitude: %d", amplitude_abs);
+                register_tap_main(data);
             } else {
                 LOG_INF("MAIN trigger disabled amplitude: %d", amplitude_abs);
             }
-            register_tap_main(data);
         } else {
             LOG_ERR("Problem with main_handler");
         }
     } else if (amplitude_abs > data->treshold_warn && data->shake_warn == 0 && !data->max_level_alert_warn && data->warn_zone_active) {
         data->shake_warn = CONFIG_SHAKE_WARN_TIME;
         if (data->warn_handler) {
-            if (!data->max_level_alert_warn)
-            {
-                data->warn_handler(dev, data->warn_trigger);
-                LOG_INF("WARN amplitude: %d", amplitude_abs);
-            } else {
-                LOG_INF("WARN trigger disabled amplitude: %d", amplitude_abs);
-            }
-            register_tap_warn(data);
+            if (current_time - data->last_tap_time_warn > MIN_TAP_INTERVAL){
+                if (!data->max_level_alert_warn)
+                {
+                    data->warn_handler(dev, data->warn_trigger);
+                    LOG_INF("WARN amplitude: %d", amplitude_abs);
+                    register_tap_warn(data);
+                } else {
+                    LOG_INF("WARN trigger disabled amplitude: %d", amplitude_abs);
+                }
+            } 
         } else {
             LOG_ERR("Problem with warn_handler");
         }
@@ -645,7 +653,6 @@ static void adc_vbus_work_handler(struct k_work *work)
         if (!data->main_zone_active && !data->warn_zone_active) {
             goto end;
         }
-        int64_t current_time = k_uptime_get();
         if ((current_time - data->max_main_noise_level_time) > data->noise_sampling_interval_msec) {
             int prev_level = data->max_main_noise_level;
             LOG_INF("MAIN noise window reset. Previous max: %d", data->max_main_noise_level);
@@ -965,10 +972,10 @@ static void coarsering_main(struct sensor_data *data, bool increase)
 static void register_tap_main(struct sensor_data *data)
 {
     int64_t current_time = k_uptime_get();
-    if (current_time - data->last_tap_time_main < MIN_TAP_INTERVAL) {
-        // LOG_INF("Warning: Possible abuse detected, taps too frequent");
-        return;
-    }
+    // if (current_time - data->last_tap_time_main < MIN_TAP_INTERVAL) {
+    //     // LOG_INF("Warning: Possible abuse detected, taps too frequent");
+    //     return;
+    // }
     data->last_tap_time_main = current_time;
     coarsering_main(data, true);
     
@@ -977,10 +984,10 @@ static void register_tap_main(struct sensor_data *data)
 static void register_tap_warn(struct sensor_data *data)
 {
     int64_t current_time = k_uptime_get();
-    if (current_time - data->last_tap_time_warn < MIN_TAP_INTERVAL) {
-        // LOG_INF("Warning: Possible abuse detected, taps too frequent");
-        return;
-    } 
+    // if (current_time - data->last_tap_time_warn < MIN_TAP_INTERVAL) {
+    //     // LOG_INF("Warning: Possible abuse detected, taps too frequent");
+    //     return;
+    // } 
     data->last_tap_time_warn = current_time;
     coarsering_warn(data, true);
 } 
