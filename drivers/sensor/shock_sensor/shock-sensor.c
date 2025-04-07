@@ -15,7 +15,8 @@
 #include <math.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
+// LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
+LOG_MODULE_REGISTER(shock_sensor, LOG_LEVEL_DBG);
 
 #ifdef CONFIG_SEQUENCE_32BITS_REGISTERS
     #define ADC_READING_TYPE uint32_t
@@ -230,7 +231,6 @@ static int attr_set(const struct device *dev,
 {
     struct sensor_data *data = dev->data;
 
-    printk("[%s] dev: %p, chan: %d, attr: %d, val1: %d, val2: %d\n", __func__, dev, chan, attr, val->val1, val->val2);
     if (chan == SENSOR_CHAN_PROX && attr == SENSOR_ATTR_UPPER_THRESH) {
         data->treshold_warn = val->val1;
         data->treshold_main = val->val2;
