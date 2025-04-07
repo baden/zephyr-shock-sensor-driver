@@ -15,8 +15,8 @@
 #include <math.h>
 #include <zephyr/logging/log.h>
 
-// LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
-LOG_MODULE_REGISTER(shock_sensor, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
+// LOG_MODULE_REGISTER(shock_sensor, LOG_LEVEL_DBG);
 
 #ifdef CONFIG_SEQUENCE_32BITS_REGISTERS
     #define ADC_READING_TYPE uint32_t
@@ -264,6 +264,14 @@ static int attr_set(const struct device *dev,
             data->selected_warn_zone = 9;
             data->current_main_zone = data->selected_main_zone;
             set_zones(dev, data->current_warn_zone, data->current_main_zone);
+            data->last_tap_time_warn = current_time;
+            data->last_tap_time_main = current_time;
+            data->max_main_noise_level = 0;
+            data->max_main_noise_level_time = current_time;
+            data->max_warn_noise_level = 0;
+            data->max_warn_noise_level_time = current_time;
+            data->max_level_alert_warn = false;
+            data->max_level_alert_main = false;
             LOG_INF("WARN_ZONE disabled");
             return 0;
         }
@@ -297,6 +305,14 @@ static int attr_set(const struct device *dev,
         if (val->val1 == 0) {
             data->main_zone_active = false;
             data->current_main_zone = data->selected_main_zone;
+            data->last_tap_time_warn = current_time;
+            data->last_tap_time_main = current_time;
+            data->max_main_noise_level = 0;
+            data->max_main_noise_level_time = current_time;
+            data->max_warn_noise_level = 0;
+            data->max_warn_noise_level_time = current_time;
+            data->max_level_alert_warn = false;
+            data->max_level_alert_main = false;
             LOG_INF("MAIN_ZONE disabled");
             return 0;
         }
