@@ -340,7 +340,14 @@ static int attr_set(const struct device *dev,
                         k_timer_stop(&data->reset_timer_alarm);
                         k_timer_stop(&data->increase_sensivity_timer_warn);
                         k_timer_stop(&data->increase_sensivity_timer_main);
-                        set_zones(dev, data->current_warn_zone, data->current_main_zone);
+                        if(data->warn_zone_active){
+                            set_zones(dev, data->current_warn_zone, data->current_main_zone);
+                        } else {
+                            data->current_warn_zone = 9;
+                            data->selected_warn_zone = 9;
+                            set_zones(dev, data->current_warn_zone, data->current_main_zone);
+                        }
+                        
                         LOG_INF("Sensor is forced to disarmed mode");
                         return 0;
                     case SHOCK_SENSOR_MODE_ALARM:
