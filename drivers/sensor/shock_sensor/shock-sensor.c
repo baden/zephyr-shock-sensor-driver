@@ -230,6 +230,7 @@ static int attr_set(const struct device *dev,
 {
     struct sensor_data *data = dev->data;
 
+    printk("[%s] dev: %p, chan: %d, attr: %d, val1: %d, val2: %d\n", __func__, dev, chan, attr, val->val1, val->val2);
     if (chan == SENSOR_CHAN_PROX && attr == SENSOR_ATTR_UPPER_THRESH) {
         data->treshold_warn = val->val1;
         data->treshold_main = val->val2;
