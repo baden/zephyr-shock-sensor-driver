@@ -374,6 +374,8 @@ static int attr_set(const struct device *dev,
             case SHOCK_SENSOR_MODE_ALARM:
                 switch (val->val1) {
                     case SHOCK_SENSOR_MODE_ARMED:
+                        k_timer_start(&data->reset_timer_alarm, K_MSEC(STOP_ALARM_INTERVAL), K_NO_WAIT);
+                        LOG_INF("Alarm mode stoped in %d ms", STOP_ALARM_INTERVAL);
                         return 0;
                     case SHOCK_SENSOR_MODE_DISARMED:
                         data->mode = SHOCK_SENSOR_MODE_DISARMED;
