@@ -347,13 +347,12 @@ static int attr_set(const struct device *dev,
                             data->selected_warn_zone = 9;
                             set_zones(dev, data->current_warn_zone, data->current_main_zone);
                         }
-                        
                         LOG_INF("Sensor is forced to disarmed mode");
                         return 0;
                     case SHOCK_SENSOR_MODE_ALARM:
                         data->mode = SHOCK_SENSOR_MODE_ALARM;
                         if (val->val2 > 3000) {
-                            LOG_INF("Entering alarm mode infinity time", val->val2);
+                            LOG_INF("Entering alarm mode infinity time");
                             return 0;
                         } else {
                             k_timer_start(&data->reset_timer_alarm, K_MSEC(STOP_ALARM_INTERVAL), K_NO_WAIT);
