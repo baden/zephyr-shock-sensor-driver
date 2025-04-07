@@ -409,6 +409,16 @@ static int attr_set(const struct device *dev,
                         k_timer_start(&data->reset_timer_alarm, K_MSEC(STOP_ALARM_INTERVAL), K_NO_WAIT);
                         LOG_INF("Alarm mode stoped in %d ms", STOP_ALARM_INTERVAL);
                         return 0;
+                    case SHOCK_SENSOR_MODE_ALARM:
+                        data->mode = SHOCK_SENSOR_MODE_ALARM;
+                        if (val->val2 > 3000) {
+                            LOG_INF("Entering alarm mode infinity time");
+                            return 0;
+                        } else {
+                            k_timer_start(&data->reset_timer_alarm, K_MSEC(STOP_ALARM_INTERVAL), K_NO_WAIT);
+                            LOG_INF("Entering alarm mode for %d ms", STOP_ALARM_INTERVAL);
+                            return 0;
+                        }
                     default:
                         return -ENOTSUP;
                 }
