@@ -16,6 +16,7 @@
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
+// LOG_MODULE_REGISTER(shock_sensor, LOG_LEVEL_DBG);
 
 #ifdef CONFIG_SEQUENCE_32BITS_REGISTERS
     #define ADC_READING_TYPE uint32_t
@@ -27,7 +28,9 @@ LOG_MODULE_REGISTER(shock_sensor, CONFIG_SENSOR_LOG_LEVEL);
 #define MAX_WARN_TAP_LEVEL 241
 
 #define CONFIG_SEQUENCE_SAMPLES 16
-#define MIN_TAP_INTERVAL 1000 // ms
+#define MIN_TAP_INTERVAL 2000 // ms
+#define STOP_ALARM_INTERVAL 5000
+
 #define ADC_READ_MAX_ATTEMPTS 3
 
 struct sensor_data {
@@ -56,7 +59,8 @@ struct sensor_data {
     int current_main_zone;
     bool max_level_alert_warn;
     bool max_level_alert_main;
-
+    bool warn_zone_active;
+    bool main_zone_active;
     int treshold_warn;
     int treshold_main;
 
@@ -88,7 +92,7 @@ struct sensor_data {
 };
 
 // static const int warn_zones_initial[16] = {4, 5, 6, 8, 10, 12, 14, 17, 20, 23, 27, 32, 37, 43, 50, 60};
-static const int warn_zones_initial[10] = {6, 10, 16, 25, 39, 61, 97, 152, 240};
+static const int warn_zones_initial[10] = {4, 6, 10, 16, 25, 39, 61, 97, 152, 240};
 static const float koeff[10] = {
     1.76893602,
     1.698646465,
@@ -226,7 +230,7 @@ static int attr_set(const struct device *dev,
     const struct sensor_value *val)
 {
     struct sensor_data *data = dev->data;
-
+    LOG_DBG("[%s] dev: %p, chan: %d, attr: %d, val1: %d, val2: %d", __func__, dev, chan, attr, val->val1, val->val2);
     if (chan == SENSOR_CHAN_PROX && attr == SENSOR_ATTR_UPPER_THRESH) {
         data->treshold_warn = val->val1;
         data->treshold_main = val->val2;
@@ -253,19 +257,39 @@ static int attr_set(const struct device *dev,
         return 0;
     }
 
+    int64_t current_time = k_uptime_get();
+    
     if (chan == (enum sensor_channel)SHOCK_SENSOR_CHANNEL_WARN_ZONE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
+        if (val->val1 == 0) {
+            data->warn_zone_active = false;
+            data->current_warn_zone = 9;
+            data->selected_warn_zone = 9;
+            data->current_main_zone = data->selected_main_zone;
+            set_zones(dev, data->current_warn_zone, data->current_main_zone);
+            data->last_tap_time_warn = current_time;
+            data->last_tap_time_main = current_time;
+            data->max_main_noise_level = 0;
+            data->max_main_noise_level_time = current_time;
+            data->max_warn_noise_level = 0;
+            data->max_warn_noise_level_time = current_time;
+            data->max_level_alert_warn = false;
+            data->max_level_alert_main = false;
+            LOG_INF("WARN_ZONE disabled");
+            return 0;
+        }
+        int value = val->val1 / 10;
         int64_t current_time = k_uptime_get();
-        data->current_warn_zone = 10 - val->val1; 
+        data->current_warn_zone = 10 - value; 
         if (data->current_warn_zone < 0) {
             data->current_warn_zone = 0;
         }
         if (data->current_warn_zone > 9) {
             data->current_warn_zone = 9;
         }
+        data->warn_zone_active = true;
         data->selected_warn_zone = data->current_warn_zone;
-        create_main_zones(dev, val->val1);
-        data->current_main_zone = 0;
-        data->selected_main_zone = 0;
+        create_main_zones(dev, data->current_warn_zone);
+        data->current_main_zone = data->selected_main_zone;
         data->last_tap_time_warn = current_time;
         data->last_tap_time_main = current_time;
         data->max_main_noise_level = 0;
@@ -280,14 +304,30 @@ static int attr_set(const struct device *dev,
     }
 
     if (chan == (enum sensor_channel)SHOCK_SENSOR_CHANNEL_MAIN_ZONE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
+        if (val->val1 == 0) {
+            data->main_zone_active = false;
+            data->current_main_zone = data->selected_main_zone;
+            data->last_tap_time_warn = current_time;
+            data->last_tap_time_main = current_time;
+            data->max_main_noise_level = 0;
+            data->max_main_noise_level_time = current_time;
+            data->max_warn_noise_level = 0;
+            data->max_warn_noise_level_time = current_time;
+            data->max_level_alert_warn = false;
+            data->max_level_alert_main = false;
+            LOG_INF("MAIN_ZONE disabled");
+            return 0;
+        }
+        int value = val->val1 / 10;
         int64_t current_time = k_uptime_get();
-        data->current_main_zone = 10 - val->val1;
+        data->current_main_zone = 10 - value;
         if (data->current_main_zone < 0) {
             data->current_main_zone = 0;
         }
         if (data->current_main_zone > 9) {
             data->current_main_zone = 9;
         }
+        data->main_zone_active = true;
         data->selected_main_zone = data->current_main_zone;
         data->current_warn_zone = data->selected_warn_zone;
         data->last_tap_time_warn = current_time;
@@ -304,54 +344,157 @@ static int attr_set(const struct device *dev,
     }
 
     if (chan == (enum sensor_channel)SHOCK_SENSOR_MODE && attr == (enum sensor_attribute)SHOCK_SENSOR_SPECIAL_ATTRS) {
+        // LOG_INF("Current mode: %d -> %d", data->mode, val->val1);
+        switch (data->mode) {
+            case SHOCK_SENSOR_MODE_ARMED:
+                switch (val->val1) {
+                    case SHOCK_SENSOR_MODE_ARMED:
+                        return 0;
+                    case SHOCK_SENSOR_MODE_DISARMED:
+                        data->mode = SHOCK_SENSOR_MODE_DISARMED;
+                        data->current_warn_zone = data->selected_warn_zone;
+                        data->current_main_zone = data->selected_main_zone;
+                        data->max_level_alert_warn = false;
+                        data->max_level_alert_main = false;
+                        k_timer_stop(&data->reset_timer_alarm);
+                        k_timer_stop(&data->increase_sensivity_timer_warn);
+                        k_timer_stop(&data->increase_sensivity_timer_main);
+                        if(data->warn_zone_active){
+                            set_zones(dev, data->current_warn_zone, data->current_main_zone);
+                        } else {
+                            data->current_warn_zone = 9;
+                            data->selected_warn_zone = 9;
+                            set_zones(dev, data->current_warn_zone, data->current_main_zone);
+                        }
+                        LOG_INF("Sensor is forced to disarmed mode");
+                        return 0;
+                    case SHOCK_SENSOR_MODE_ALARM:
+                        data->mode = SHOCK_SENSOR_MODE_ALARM;
+                        if (val->val2 > 3000) {
+                            LOG_INF("Entering alarm mode infinity time");
+                            return 0;
+                        } else {
+                            k_timer_start(&data->reset_timer_alarm, K_MSEC(STOP_ALARM_INTERVAL), K_NO_WAIT);
+                            LOG_INF("Entering alarm mode for %d ms", STOP_ALARM_INTERVAL);
+                            return 0;
+                        }     
+                    case SHOCK_SENSOR_MODE_ALARM_STOP:
+                        return 0;
+                    default:
+                        return -ENOTSUP;
+                }
+            case SHOCK_SENSOR_MODE_DISARMED:
+                switch (val->val1) {
+                    case SHOCK_SENSOR_MODE_ARMED:
+                        data->mode = SHOCK_SENSOR_MODE_ARMED;
+                        int64_t current_time = k_uptime_get();
+                        data->last_tap_time_warn = current_time;
+                        data->last_tap_time_main = current_time;
+                        k_timer_stop(&data->reset_timer_alarm);
+                        k_timer_stop(&data->increase_sensivity_timer_warn);
+                        k_timer_stop(&data->increase_sensivity_timer_main);
+                        data->max_main_noise_level = 0;
+                        data->max_main_noise_level_time = current_time;
+                        data->max_warn_noise_level = 0;
+                        data->max_warn_noise_level_time = current_time;
+                        LOG_INF("Sensor is armed");
+                        return 0;
+                    case SHOCK_SENSOR_MODE_DISARMED:
+                        return 0;
+                    case SHOCK_SENSOR_MODE_ALARM_STOP:
+                        return 0;
+                    case SHOCK_SENSOR_MODE_ALARM:
+                        return 0;
+                    default:
+                        return -ENOTSUP;
+                }
+            case SHOCK_SENSOR_MODE_ALARM:
+                switch (val->val1) {
+                    case SHOCK_SENSOR_MODE_ARMED:
+                        return 0;
+                    case SHOCK_SENSOR_MODE_DISARMED:
+                        data->mode = SHOCK_SENSOR_MODE_DISARMED;
+                        data->current_warn_zone = data->selected_warn_zone;
+                        data->current_main_zone = data->selected_main_zone;
+                        data->max_level_alert_warn = false;
+                        data->max_level_alert_main = false;
+                        k_timer_stop(&data->reset_timer_alarm);
+                        k_timer_stop(&data->increase_sensivity_timer_warn);
+                        k_timer_stop(&data->increase_sensivity_timer_main);
+                        set_zones(dev, data->current_warn_zone, data->current_main_zone);
+                        LOG_INF("Sensor is forced to disarmed mode");
+                        return 0;
+                    case SHOCK_SENSOR_MODE_ALARM_STOP:
+                        k_timer_start(&data->reset_timer_alarm, K_MSEC(STOP_ALARM_INTERVAL), K_NO_WAIT);
+                        LOG_INF("Alarm mode stoped in %d ms", STOP_ALARM_INTERVAL);
+                        return 0;
+                    case SHOCK_SENSOR_MODE_ALARM:
+                        data->mode = SHOCK_SENSOR_MODE_ALARM;
+                        if (val->val2 > 3000) {
+                            LOG_INF("Entering alarm mode infinity time");
+                            return 0;
+                        } else {
+                            k_timer_start(&data->reset_timer_alarm, K_MSEC(STOP_ALARM_INTERVAL), K_NO_WAIT);
+                            LOG_INF("Entering alarm mode for %d ms", STOP_ALARM_INTERVAL);
+                            return 0;
+                        }
+                    default:
+                        return -ENOTSUP;
+                }
+            case SHOCK_SENSOR_MODE_ALARM_STOP:
+                return 0;
+            default:
+                return -ENOTSUP;
+        }
+
+
+        // if (val->val1 == SHOCK_SENSOR_MODE_ALARM && data->mode == SHOCK_SENSOR_MODE_ARMED) { 
+        //     data->mode = SHOCK_SENSOR_MODE_ALARM;
+        //     k_timer_start(&data->reset_timer_alarm, K_MSEC(val->val2), K_NO_WAIT);
+        //     LOG_INF("Entering alarm mode for %d ms", val->val2);
+        // }
+
+        // if (val->val1 == SHOCK_SENSOR_MODE_ALARM) {
+        //     return 0;
+        // }
         
+        // data->mode = val->val1;
 
-        if (val->val1 == SHOCK_SENSOR_MODE_ALARM && data->mode == SHOCK_SENSOR_MODE_ARMED) { 
-            data->mode = SHOCK_SENSOR_MODE_ALARM;
-            k_timer_start(&data->reset_timer_alarm, K_MSEC(val->val2), K_NO_WAIT);
-            LOG_INF("Entering alarm mode for %d ms", val->val2);
-        }
-
-        if (val->val1 == SHOCK_SENSOR_MODE_ALARM) {
-            return 0;
-        }
-        
-        data->mode = val->val1;
-
-        if (data->mode == SHOCK_SENSOR_MODE_ALARM_STOP) {
-            data->mode = SHOCK_SENSOR_MODE_ARMED;
-            k_timer_stop(&data->reset_timer_alarm);
-            // k_timer_stop(&data->increase_sensivity_timer_warn);
-            // k_timer_stop(&data->increase_sensivity_timer_main);
-            LOG_INF("Forced stop alarm mode");
-        }
-        if (data->mode == SHOCK_SENSOR_MODE_DISARMED || data->mode == SHOCK_SENSOR_MODE_TURN_OFF) {
-            data->current_warn_zone = data->selected_warn_zone;
-            data->current_main_zone = data->selected_main_zone;
-            data->max_level_alert_warn = false;
-            data->max_level_alert_main = false;
-            k_timer_stop(&data->reset_timer_alarm);
-            k_timer_stop(&data->increase_sensivity_timer_warn);
-            k_timer_stop(&data->increase_sensivity_timer_main);
-            set_zones(dev, data->current_warn_zone, data->current_main_zone);
-            LOG_INF("Sensor is forced to disarmed mode");
-        }
-        if (data->mode == SHOCK_SENSOR_MODE_ARMED) {
-            int64_t current_time = k_uptime_get();
-            data->last_tap_time_warn = current_time;
-            data->last_tap_time_main = current_time;
-            k_timer_stop(&data->reset_timer_alarm);
-            k_timer_stop(&data->increase_sensivity_timer_warn);
-            k_timer_stop(&data->increase_sensivity_timer_main);
-            data->max_main_noise_level = 0;
-            data->max_main_noise_level_time = current_time;
-            data->max_warn_noise_level = 0;
-            data->max_warn_noise_level_time = current_time;
-            // k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
-            // k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
-            LOG_INF("Sensor is armed");
-        }
-        return 0;
+        // if (data->mode == SHOCK_SENSOR_MODE_ALARM_STOP) {
+        //     // data->mode = SHOCK_SENSOR_MODE_ARMED;
+        //     // k_timer_stop(&data->reset_timer_alarm);
+        //     k_timer_start(&data->reset_timer_alarm, K_MSEC(STOP_ALARM_INTERVAL), K_NO_WAIT);
+        //     // k_timer_stop(&data->increase_sensivity_timer_warn);
+        //     // k_timer_stop(&data->increase_sensivity_timer_main);
+        //     LOG_INF("Alarm mode stoped in %d ms", STOP_ALARM_INTERVAL);
+        // }
+        // if (data->mode == SHOCK_SENSOR_MODE_DISARMED) {
+        //     data->current_warn_zone = data->selected_warn_zone;
+        //     data->current_main_zone = data->selected_main_zone;
+        //     data->max_level_alert_warn = false;
+        //     data->max_level_alert_main = false;
+        //     k_timer_stop(&data->reset_timer_alarm);
+        //     k_timer_stop(&data->increase_sensivity_timer_warn);
+        //     k_timer_stop(&data->increase_sensivity_timer_main);
+        //     set_zones(dev, data->current_warn_zone, data->current_main_zone);
+        //     LOG_INF("Sensor is forced to disarmed mode");
+        // }
+        // if (data->mode == SHOCK_SENSOR_MODE_ARMED) {
+        //     int64_t current_time = k_uptime_get();
+        //     data->last_tap_time_warn = current_time;
+        //     data->last_tap_time_main = current_time;
+        //     k_timer_stop(&data->reset_timer_alarm);
+        //     k_timer_stop(&data->increase_sensivity_timer_warn);
+        //     k_timer_stop(&data->increase_sensivity_timer_main);
+        //     data->max_main_noise_level = 0;
+        //     data->max_main_noise_level_time = current_time;
+        //     data->max_warn_noise_level = 0;
+        //     data->max_warn_noise_level_time = current_time;
+        //     // k_timer_start(&data->increase_sensivity_timer_warn, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
+        //     // k_timer_start(&data->increase_sensivity_timer_main, K_SECONDS(data->increase_sensivity_interval), K_NO_WAIT);
+        //     LOG_INF("Sensor is armed");
+        // }
+        // return 0;
     }
 
     return -ENOTSUP;
@@ -592,38 +735,46 @@ static void adc_vbus_work_handler(struct k_work *work)
     //     debug_counter = 0;
     // }
 
-    if (amplitude_abs > data->treshold_main && data->shake_main == 0 && !data->max_level_alert_main) {
+    int64_t current_time = k_uptime_get();
+
+    if (amplitude_abs > data->treshold_main && data->shake_main == 0 && !data->max_level_alert_main && data->main_zone_active) {
         data->shake_main = CONFIG_SHAKE_MAIN_TIME;
         if (data->main_handler) {
             if (!data->max_level_alert_main)
             {
-                data->main_handler(dev, data->main_trigger);
+                data->mode = SHOCK_SENSOR_MODE_ALARM;
+                data->main_handler(dev, data->main_trigger);  
                 LOG_INF("MAIN amplitude: %d", amplitude_abs);
+                // LOG_INF("MAIN amplitude: %d %d", amplitude_abs, data->mode);
+                register_tap_main(data);
             } else {
                 LOG_INF("MAIN trigger disabled amplitude: %d", amplitude_abs);
             }
-            register_tap_main(data);
         } else {
             LOG_ERR("Problem with main_handler");
         }
-    } else if (amplitude_abs > data->treshold_warn && data->shake_warn == 0 && !data->max_level_alert_warn) {
+    } else if (amplitude_abs > data->treshold_warn && data->shake_warn == 0 && !data->max_level_alert_warn && data->warn_zone_active) {
         data->shake_warn = CONFIG_SHAKE_WARN_TIME;
         if (data->warn_handler) {
-            if (!data->max_level_alert_warn)
-            {
-                data->warn_handler(dev, data->warn_trigger);
-                LOG_INF("WARN amplitude: %d", amplitude_abs);
-            } else {
-                LOG_INF("WARN trigger disabled amplitude: %d", amplitude_abs);
-            }
-            register_tap_warn(data);
+            if (current_time - data->last_tap_time_warn > MIN_TAP_INTERVAL){
+                if (!data->max_level_alert_warn)
+                {
+                    data->warn_handler(dev, data->warn_trigger);
+                    LOG_INF("WARN amplitude: %d", amplitude_abs);
+                    register_tap_warn(data);
+                } else {
+                    LOG_INF("WARN trigger disabled amplitude: %d", amplitude_abs);
+                }
+            } 
         } else {
             LOG_ERR("Problem with warn_handler");
         }
     } else if (data->shake_warn == 0 && data->shake_main == 0) {
         data->shake_warn = CONFIG_SHAKE_MAIN_TIME;
         data->shake_main = CONFIG_SHAKE_WARN_TIME;
-        int64_t current_time = k_uptime_get();
+        if (!data->main_zone_active && !data->warn_zone_active) {
+            goto end;
+        }
         if ((current_time - data->max_main_noise_level_time) > data->noise_sampling_interval_msec) {
             int prev_level = data->max_main_noise_level;
             LOG_INF("MAIN noise window reset. Previous max: %d", data->max_main_noise_level);
@@ -819,6 +970,7 @@ static void increase_sensivity_warn_handler(struct k_timer *timer)
     struct sensor_data *data = CONTAINER_OF(timer, struct sensor_data, increase_sensivity_timer_warn);
 
     if (data->mode != SHOCK_SENSOR_MODE_ARMED) return;
+    if (data->warn_zone_active == false) return;
     coarsering_warn(data, false);
 }
 
@@ -827,6 +979,7 @@ static void increase_sensivity_main_handler(struct k_timer *timer)
     struct sensor_data *data = CONTAINER_OF(timer, struct sensor_data, increase_sensivity_timer_main);
 
     if (data->mode != SHOCK_SENSOR_MODE_ARMED) return;
+    if (data->main_zone_active == false) return;
     coarsering_main(data, false);
     
 }
@@ -834,7 +987,6 @@ static void increase_sensivity_main_handler(struct k_timer *timer)
 static void set_zones(const struct device *dev, int warn_zone, int main_zone)
 {
     struct sensor_data *data = dev->data;
-    
     data->selected_warn_zone = warn_zone;
     data->current_warn_zone = warn_zone;
     create_main_zones(dev, warn_zone);
@@ -942,10 +1094,10 @@ static void coarsering_main(struct sensor_data *data, bool increase)
 static void register_tap_main(struct sensor_data *data)
 {
     int64_t current_time = k_uptime_get();
-    if (current_time - data->last_tap_time_main < MIN_TAP_INTERVAL) {
-        // LOG_INF("Warning: Possible abuse detected, taps too frequent");
-        return;
-    }
+    // if (current_time - data->last_tap_time_main < MIN_TAP_INTERVAL) {
+    //     // LOG_INF("Warning: Possible abuse detected, taps too frequent");
+    //     return;
+    // }
     data->last_tap_time_main = current_time;
     coarsering_main(data, true);
     
@@ -954,10 +1106,10 @@ static void register_tap_main(struct sensor_data *data)
 static void register_tap_warn(struct sensor_data *data)
 {
     int64_t current_time = k_uptime_get();
-    if (current_time - data->last_tap_time_warn < MIN_TAP_INTERVAL) {
-        // LOG_INF("Warning: Possible abuse detected, taps too frequent");
-        return;
-    } 
+    // if (current_time - data->last_tap_time_warn < MIN_TAP_INTERVAL) {
+    //     // LOG_INF("Warning: Possible abuse detected, taps too frequent");
+    //     return;
+    // } 
     data->last_tap_time_warn = current_time;
     coarsering_warn(data, true);
 } 
